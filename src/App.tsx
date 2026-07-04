@@ -3,6 +3,7 @@ import { useZwds, BirthInput } from "./core/useZwds";
 import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
+import { downloadJson, downloadMd } from "./core/exportData";
 
 const STORAGE_KEY = "zwds-input";
 
@@ -13,6 +14,11 @@ const DEFAULT_INPUT: BirthInput = {
   date: "2000-08-16",
   timeIndex: 2,
   isLeapMonth: false,
+  exactTime: "",
+  useTrueSolar: false,
+  longitude: 120,
+  algorithm: "default",
+  yearDivide: "normal",
 };
 
 function loadInput(): BirthInput {
@@ -45,6 +51,24 @@ export default function App() {
       <header className="top">
         <h1>紫微斗数</h1>
         <span className="top-sub">玄机排盘 · iztro 引擎 · 自研盘面</span>
+        <div className="top-actions">
+          <button
+            type="button"
+            disabled={!z.astrolabe}
+            onClick={() => downloadJson(z)}
+            title="导出完整命盘+运限数据（JSON），可上传给 AI 分析"
+          >
+            导出 JSON
+          </button>
+          <button
+            type="button"
+            disabled={!z.astrolabe}
+            onClick={() => downloadMd(z)}
+            title="导出完整命盘+运限报告（Markdown），可上传给 AI 分析"
+          >
+            导出 MD
+          </button>
+        </div>
       </header>
 
       <InputPanel value={input} onApply={apply} />

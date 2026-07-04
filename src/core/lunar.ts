@@ -48,3 +48,13 @@ export function dayGanZhi(solarStr: string): string {
     return "";
   }
 }
+
+/** 农历日期字符串（YYYY-M-D，支持闰月）→ 公历字符串，失败返回 null */
+export function lunarStrToSolarStr(dateStr: string, isLeapMonth: boolean): string | null {
+  try {
+    const s = lunar2solar(dateStr, isLeapMonth);
+    return `${s.solarYear}-${s.solarMonth}-${s.solarDay}`;
+  } catch {
+    return null;
+  }
+}

@@ -15,6 +15,8 @@ export function CenterPanel({ z }: { z: Zwds }) {
   const yinyang = `${isYangStem(yearStem) ? "阳" : "阴"}${a.gender}`;
   const qiyun = z.decades[0]?.range[0];
   const allOff = SCOPES.every((s) => !z.visible[s]);
+  const origin = a.palaces.find((p) => p.isOriginalPalace);
+  const ts = z.trueSolar;
 
   return (
     <div className="center" style={{ gridArea: "c" }}>
@@ -57,6 +59,15 @@ export function CenterPanel({ z }: { z: Zwds }) {
             {a.zodiac} · {a.sign}
           </span>
         </div>
+        {ts && (
+          <div className="ci ci-wide">
+            <b>真太阳时</b>
+            <span title={`经度 ${ts.longitude}° · 均时差 ${ts.eotMinutes.toFixed(1)} 分`}>
+              {ts.trueDate} {ts.trueTime}（钟表 {ts.clockTime}，{ts.offsetMinutes >= 0 ? "+" : ""}
+              {ts.offsetMinutes.toFixed(1)}分）
+            </span>
+          </div>
+        )}
         <div className="ci">
           <b>命主·身主</b>
           <span>
@@ -69,6 +80,14 @@ export function CenterPanel({ z }: { z: Zwds }) {
             {a.earthlyBranchOfSoulPalace} · {a.earthlyBranchOfBodyPalace}
           </span>
         </div>
+        {origin && (
+          <div className="ci">
+            <b>来因宫</b>
+            <span>
+              {origin.name}（{origin.earthlyBranch}）
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="pillars">
@@ -84,7 +103,8 @@ export function CenterPanel({ z }: { z: Zwds }) {
       {h && (
         <div className="target-line">
           <span className="tl-tag">观测</span>
-          公历 {h.solarDate} · 农历 {h.lunarDate} · {BRANCHES[z.pick.hour]}时
+          公历 {h.solarDate} · 农历 {h.lunarDate} · {BRANCHES[z.pick.hour]}时 · 虚岁
+          {h.age.nominalAge}
         </div>
       )}
 

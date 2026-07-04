@@ -10,11 +10,19 @@ import {
   LUNAR_DAYS,
   LUNAR_MONTHS,
   Scope,
+  applyTrueSolar,
   hourGanZhi,
   monthGanZhi,
   yearGanZhi,
 } from "./utils";
-import { daysInLunarMonth, dayGanZhi, fmtSolar, lunarToSolarStr, todayLunar } from "./lunar";
+import {
+  daysInLunarMonth,
+  dayGanZhi,
+  fmtSolar,
+  lunarStrToSolarStr,
+  lunarToSolarStr,
+  todayLunar,
+} from "./lunar";
 
 export type Astrolabe = ReturnType<typeof astro.bySolar>;
 export type Horoscope = ReturnType<Astrolabe["horoscope"]>;
@@ -29,6 +37,27 @@ export type BirthInput = {
   /** 0~12（早子~晚子） */
   timeIndex: number;
   isLeapMonth: boolean;
+  /** 精确出生时刻 HH:mm（可空；填写后驱动时辰） */
+  exactTime: string;
+  /** 按真太阳时排盘（需填写精确时刻） */
+  useTrueSolar: boolean;
+  /** 出生地经度（东经为正），默认 120 */
+  longitude: number;
+  /** 安星流派：通行版（南派）/ 中州派 */
+  algorithm: "default" | "zhongzhou";
+  /** 年分界：正月初一 / 立春（同时作用于运限分界） */
+  yearDivide: "normal" | "exact";
+};
+
+export type TrueSolarInfo = {
+  clockDate: string;
+  clockTime: string;
+  trueDate: string;
+  trueTime: string;
+  timeIndex: number;
+  offsetMinutes: number;
+  eotMinutes: number;
+  longitude: number;
 };
 
 export type PickState = { year: number; month: number; day: number; hour: number };
@@ -54,20 +83,54 @@ function initPick(): PickState {
 }
 
 export function useZwds(input: BirthInput) {
+  /** 真太阳时校正后的实际排盘参数 */
+  const effective = useMemo(() => {
+    const base = {
+      calendar: input.calendar,
+      dateStr: input.date,
+      timeIndex: input.timeIndex,
+      trueSolar: null as TrueSolarInfo | null,
+    };
+    if (!input.useTrueSolar || !input.exactTime) return base;
+    const solarStr =
+      input.calendar === "lunar"
+        ? lunarStrToSolarStr(input.date, input.isLeapMonth)
+        : input.date;
+    if (!solarStr) return base;
+    const adj = applyTrueSolar(solarStr, input.exactTime, input.longitude);
+    if (!adj) return base;
+    return {
+      calendar: "solar" as const,
+      dateStr: adj.dateStr,
+      timeIndex: adj.timeIndex,
+      trueSolar: {
+        clockDate: solarStr,
+        clockTime: input.exactTime,
+        trueDate: adj.dateStr,
+        trueTime: adj.timeStr,
+        timeIndex: adj.timeIndex,
+        offsetMinutes: adj.offsetMinutes,
+        eotMinutes: adj.eotMinutes,
+        longitude: input.longitude,
+      },
+    };
+  }, [input]);
+
   const astrolabe = useMemo<Astrolabe | null>(() => {
     try {
-      return input.calendar === "lunar"
+      astro.config({ algorithm: input.algorithm, yearDivide: input.yearDivide, horoscopeDivide: input.yearDivide });
+      return effective.calendar === "lunar"
         ? astro.byLunar(
-            input.date,
-            input.timeIndex,
+            effective.dateStr,
+            effective.timeIndex,
             input.gender as unknown as GenderName,
             input.isLeapMonth,
             true,
             "zh-CN"
           )
         : astro.bySolar(
-            input.date,
-            input.timeIndex,
+            effective.dateStr,
+            effective.timeIndex,
             input.gender as unknown as GenderName,
             true,
             "zh-CN"
@@ -76,7 +139,7 @@ export function useZwds(input: BirthInput) {
       console.error("[zwds] 排盘失败", e);
       return null;
     }
-  }, [input]);
+  }, [effective, input.gender, input.isLeapMonth, input.algorithm, input.yearDivide]);
 
   const birthLunarYear = astrolabe?.rawDates.lunarDate.lunarYear ?? new Date().getFullYear();
 
@@ -239,6 +302,12 @@ export function useZwds(input: BirthInput) {
     },
   };
 
+  /** 本命命宫索引 */
+  const soulPalaceIndex = useMemo(
+    () => astrolabe?.palaces.findIndex((p) => p.name === "命宫") ?? -1,
+    [astrolabe]
+  );
+
   return {
     input,
     astrolabe,
@@ -256,6 +325,8 @@ export function useZwds(input: BirthInput) {
     pick,
     visible,
     targetSolar,
+    trueSolar: effective.trueSolar,
+    soulPalaceIndex,
     actions,
   };
 }

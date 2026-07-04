@@ -90,3 +90,57 @@ export function isYangStem(stem: string): boolean {
   const i = STEMS.indexOf(stem as (typeof STEMS)[number]);
   return i >= 0 && i % 2 === 0;
 }
+
+/** 钟表小时 → iztro timeIndex（23 点为晚子时 12） */
+export function timeIndexFromClock(hour: number): number {
+  if (hour >= 23) return 12;
+  return Math.floor((hour + 1) / 2);
+}
+
+/** 均时差（分钟），N 为年内第几日 */
+export function equationOfTime(dayOfYear: number): number {
+  const b = (2 * Math.PI * (dayOfYear - 81)) / 364;
+  return 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+}
+
+export type TrueSolarResult = {
+  /** 校正后公历日期 YYYY-M-D */
+  dateStr: string;
+  /** 校正后时刻 HH:mm */
+  timeStr: string;
+  timeIndex: number;
+  /** 总偏移（分钟，含经度差与均时差） */
+  offsetMinutes: number;
+  eotMinutes: number;
+};
+
+/**
+ * 真太阳时校正：输入按东八区（120°E）钟表时间解释。
+ * 真太阳时 = 钟表时间 + (经度 − 120) × 4 分钟 + 均时差
+ */
+export function applyTrueSolar(
+  solarDateStr: string,
+  timeStr: string,
+  longitude: number
+): TrueSolarResult | null {
+  const dm = solarDateStr.split(/[-/.]/).map(Number);
+  const tm = timeStr.split(":").map(Number);
+  if (dm.length < 3 || tm.length < 2 || dm.some(isNaN) || tm.some(isNaN)) return null;
+  const base = new Date(dm[0], dm[1] - 1, dm[2], tm[0], tm[1]);
+  if (isNaN(base.getTime())) return null;
+
+  const startOfYear = new Date(dm[0], 0, 1);
+  const dayOfYear = Math.floor((base.getTime() - startOfYear.getTime()) / 86400000) + 1;
+  const eot = equationOfTime(dayOfYear);
+  const offset = (longitude - 120) * 4 + eot;
+  const adj = new Date(base.getTime() + offset * 60000);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    dateStr: `${adj.getFullYear()}-${adj.getMonth() + 1}-${adj.getDate()}`,
+    timeStr: `${pad(adj.getHours())}:${pad(adj.getMinutes())}`,
+    timeIndex: timeIndexFromClock(adj.getHours()),
+    offsetMinutes: offset,
+    eotMinutes: eot,
+  };
+}

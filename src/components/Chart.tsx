@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
-import { fixIndex } from "../core/utils";
+import { useEffect, useMemo, useState } from "react";
+import { fixIndex, type Scope } from "../core/utils";
 import type { Zwds } from "../core/useZwds";
 import { PalaceCard } from "./Palace";
 import { CenterPanel } from "./CenterPanel";
+
+/** 自动聚焦优先级：最深的已显示运限层的命宫 → 本命命宫 */
+const FOCUS_ORDER: Scope[] = ["hourly", "daily", "monthly", "yearly", "decadal"];
 
 /** 各宫位在 4×4 栅格中的 [列, 行] */
 const GRID_POS: Record<number, [number, number]> = {
@@ -24,8 +27,27 @@ function anchor(i: number): { x: number; y: number } {
 
 /** 星盘：十二宫 + 中宫 + 三方四正发光连线 */
 export function Chart({ z }: { z: Zwds }) {
-  const [focus, setFocus] = useState(-1);
   const a = z.astrolabe;
+
+  /* 默认自动选中命宫：流时>流日>流月>流年>大限的命宫，全关则本命命宫 */
+  const autoFocus = useMemo(() => {
+    if (z.horoscope) {
+      for (const s of FOCUS_ORDER) {
+        if (z.visible[s]) return z.horoscope[s].index;
+      }
+    }
+    return z.soulPalaceIndex;
+  }, [z.horoscope, z.visible, z.soulPalaceIndex]);
+
+  const [userFocus, setUserFocus] = useState<number | null>(null);
+
+  // 运限选择变化后，回到自动聚焦
+  useEffect(() => {
+    setUserFocus(null);
+  }, [autoFocus]);
+
+  const focus = userFocus ?? autoFocus;
+  const handleFocus = (i: number) => setUserFocus(i === focus ? null : i);
 
   const lines = useMemo(() => {
     if (focus < 0) return [];
@@ -45,7 +67,7 @@ export function Chart({ z }: { z: Zwds }) {
       <div className="chart-wrap">
         <div className="chart">
           {a.palaces.map((p) => (
-            <PalaceCard key={p.index} palace={p} z={z} focus={focus} onFocus={setFocus} />
+            <PalaceCard key={p.index} palace={p} z={z} focus={focus} onFocus={handleFocus} />
           ))}
           <CenterPanel z={z} />
           <svg

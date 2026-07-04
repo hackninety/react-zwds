@@ -37,12 +37,6 @@
   color-scheme: dark;
 }
 
-@property --ang {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -130,6 +124,35 @@ body {
   letter-spacing: 0.3em;
 }
 
+.top-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.top-actions button {
+  padding: 6px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(85, 215, 255, 0.4);
+  background: rgba(85, 215, 255, 0.07);
+  color: var(--cyan);
+  font-size: 0.75rem;
+  font-family: inherit;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.top-actions button:hover:not(:disabled) {
+  background: rgba(85, 215, 255, 0.16);
+  box-shadow: 0 0 14px rgba(85, 215, 255, 0.35);
+}
+
+.top-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── 输入条 ── */
 .input-panel {
   display: flex;
@@ -181,6 +204,18 @@ body {
 .input-panel input[name="name"],
 .fld input[maxlength] {
   width: 90px;
+}
+
+.input-panel input[type="time"] {
+  width: 96px;
+}
+
+.input-panel input.num {
+  width: 76px;
+}
+
+.input-panel select:disabled {
+  opacity: 0.55;
 }
 
 .seg {
@@ -253,41 +288,11 @@ body {
   border-radius: 18px;
   padding: 9px;
   background: rgba(6, 10, 22, 0.55);
+  border: 1px solid rgba(96, 165, 250, 0.26);
   box-shadow:
     0 0 46px rgba(85, 215, 255, 0.1),
     0 0 130px rgba(243, 201, 107, 0.06),
     inset 0 0 26px rgba(4, 8, 20, 0.9);
-}
-
-.chart-wrap::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--ang),
-    rgba(85, 215, 255, 0) 0%,
-    rgba(85, 215, 255, 0.9) 10%,
-    rgba(243, 201, 107, 0.8) 26%,
-    rgba(85, 215, 255, 0) 40%,
-    rgba(199, 139, 255, 0.85) 58%,
-    rgba(46, 230, 200, 0.7) 74%,
-    rgba(85, 215, 255, 0) 88%,
-    rgba(85, 215, 255, 0.9) 100%
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  animation: ang-spin 9s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes ang-spin {
-  to {
-    --ang: 360deg;
-  }
 }
 
 .chart {
@@ -568,20 +573,48 @@ body {
 
 .p-body {
   font-style: normal;
-  font-size: 9px;
-  color: #ff9db8;
-  border: 1px solid rgba(255, 157, 184, 0.55);
+  font-family: var(--font-body);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #2b0716;
+  background: linear-gradient(135deg, #ff77b7, #ff9db8);
   border-radius: 3px;
-  padding: 0 2px;
-  margin-left: 3px;
+  padding: 1px 3px;
+  margin-left: 4px;
   vertical-align: 2px;
-  letter-spacing: 0;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(255, 119, 183, 0.65);
+}
+
+.p-origin {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--gold);
+  border: 1px solid rgba(243, 201, 107, 0.65);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-left: 4px;
+  vertical-align: 2px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 8px rgba(243, 201, 107, 0.3);
 }
 
 .p-range {
   font-size: 9.5px;
   color: var(--dim);
   margin-top: 1px;
+}
+
+.p-ages {
+  font-size: 8px;
+  color: var(--faint);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
 }
 
 .p-f-r {
@@ -690,6 +723,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ci-wide {
+  grid-column: 1 / -1;
+}
+
+.ci-wide span {
+  color: var(--gold);
 }
 
 /* 四柱 */
@@ -924,24 +965,77 @@ body {
   color: var(--cyan);
 }
 
-/* ── 响应式 ── */
+/* ── 响应式：≤1024px 命盘压缩进屏宽（文墨天机 APP 式高密度） ── */
+@media (max-width: 1024px) {
+  .chart-wrap {
+    min-width: 0;
+    padding: 5px;
+    border-radius: 12px;
+  }
+
+  .chart {
+    gap: 2px;
+    grid-template-rows: repeat(4, minmax(150px, auto));
+  }
+
+  .palace {
+    padding: 3px 3px 2px;
+    border-radius: 5px;
+    gap: 1px;
+  }
+
+  .star-name { font-size: 10.5px; letter-spacing: 0; }
+  .star-major .star-name { font-size: 11.5px; }
+  .star-bright { font-size: 8px; min-height: 10px; }
+  .mut { width: 11px; height: 11px; line-height: 11px; font-size: 8px; border-radius: 2px; }
+  .mut-scope { line-height: 9px; }
+  .p-adj, .p-horostars { font-size: 8.5px; gap: 0 3px; }
+  .chip { font-size: 8px; padding: 0 2px; letter-spacing: 0; border-radius: 3px; }
+  .p-chips { gap: 1px; }
+  .p-name { font-size: 11.5px; letter-spacing: 1px; }
+  .p-body, .p-origin { font-size: 8px; padding: 0 2px; margin-left: 2px; letter-spacing: 0; }
+  .p-f-l, .p-f12 { font-size: 7.5px; }
+  .p-gz { font-size: 10px; }
+  .p-range { font-size: 8px; }
+  .p-ages { display: none; }
+
+  .center { padding: 8px 9px 6px; }
+  .center-head { margin-bottom: 4px; gap: 6px; }
+  .center-head h2 { font-size: 1.05rem; letter-spacing: 0.2em; }
+  .center-sub { display: none; }
+  .center-info { grid-template-columns: 1fr; gap: 1px; font-size: 10px; }
+  .ci { gap: 5px; }
+  .pillars { gap: 5px; margin: 6px 0 2px; }
+  .pillar { padding: 3px 5px; border-radius: 5px; }
+  .pillar b { font-size: 12px; }
+  .pillar i { font-size: 8px; }
+  .target-line { font-size: 9px; padding-top: 4px; }
+  .tl-tag { font-size: 8px; padding: 0 3px; margin-right: 4px; }
+  .depth-row { gap: 4px; padding-top: 5px; }
+  .db { width: 26px; height: 24px; font-size: 11px; border-radius: 6px; }
+}
+
 @media (max-width: 760px) {
-  .top h1 {
-    font-size: 1.5rem;
-  }
+  .app { padding: 0 8px 20px; }
+  .top { gap: 10px; padding-top: 12px; }
+  .top h1 { font-size: 1.35rem; letter-spacing: 0.25em; }
+  .top-sub { display: none; }
+  .top-actions button { padding: 5px 9px; font-size: 0.68rem; }
+  .input-panel { gap: 8px 10px; padding: 8px 10px; margin: 10px 0; }
+  .btn-go { margin-left: 0; width: 100%; }
+  .chart-outer { padding: 2px 0 6px; }
 
-  .btn-go {
-    margin-left: 0;
-    width: 100%;
-  }
+  .hbar { padding: 5px; gap: 3px; bottom: 4px; border-radius: 10px; }
+  .hlabel { width: 30px; letter-spacing: 0; font-size: 10.5px; border-radius: 6px; }
+  .hcells { gap: 3px; }
+  .hcell { min-width: 48px; padding: 2px 4px; border-radius: 5px; }
+  .hcell b { font-size: 10.5px; }
+  .hcell i { font-size: 8.5px; }
+  .hcells-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; }
+  /* 流日：未选中只显日名，选中才显干支，压缩高度（同文墨） */
+  .hcells-grid .hcell:not(.on) i { display: none; }
 
-  .hcells-grid {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-  }
-
-  .hlabel {
-    width: 30px;
-    letter-spacing: 0;
-    font-size: 11px;
-  }
+  /* 中宫内容允许纵向滚动，防止被裁切 */
+  .center { overflow-y: auto; }
+  .target-line { margin-top: 6px; }
 }

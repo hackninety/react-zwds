@@ -60,7 +60,7 @@ export function PalaceCard({
     .join(" ");
 
   return (
-    <div className={cls} style={{ gridArea: `g${i}` }} onClick={() => onFocus(isFocus ? -1 : i)}>
+    <div className={cls} style={{ gridArea: `g${i}` }} onClick={() => onFocus(i)}>
       <div className="p-stars">
         <div className="p-major">
           {palace.majorStars.map((s) => (
@@ -106,10 +106,12 @@ export function PalaceCard({
         <div className="p-f-m">
           <div className="p-name">
             {palace.name}
-            {palace.isBodyPalace && <em className="p-body">身</em>}
+            {palace.isBodyPalace && <em className="p-body">身宫</em>}
+            {palace.isOriginalPalace && <em className="p-origin">来因</em>}
           </div>
-          <div className="p-range" title={`小限：${palace.ages.slice(0, 8).join(" ")}`}>
-            {palace.decadal.range.join("-")}
+          <div className="p-range">{palace.decadal.range.join("-")}</div>
+          <div className="p-ages" title={`小限岁数：${palace.ages.join(" ")}`}>
+            {palace.ages.slice(0, 5).join(" ")}
           </div>
         </div>
         <div className="p-f-r">
