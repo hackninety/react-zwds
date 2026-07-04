@@ -16,7 +16,9 @@ const DEFAULT_INPUT: BirthInput = {
   isLeapMonth: false,
   exactTime: "",
   useTrueSolar: false,
-  longitude: 120,
+  province: "北京",
+  city: "北京",
+  district: "市区",
   algorithm: "default",
   yearDivide: "normal",
 };

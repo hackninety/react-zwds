@@ -23,6 +23,7 @@ import {
   lunarToSolarStr,
   todayLunar,
 } from "./lunar";
+import { getLongitude } from "./cities";
 
 export type Astrolabe = ReturnType<typeof astro.bySolar>;
 export type Horoscope = ReturnType<Astrolabe["horoscope"]>;
@@ -37,12 +38,14 @@ export type BirthInput = {
   /** 0~12（早子~晚子） */
   timeIndex: number;
   isLeapMonth: boolean;
-  /** 精确出生时刻 HH:mm（可空；填写后驱动时辰） */
+  /** 精确出生时刻 HH:mm（真太阳时启用时使用） */
   exactTime: string;
-  /** 按真太阳时排盘（需填写精确时刻） */
+  /** 按真太阳时排盘（勾选后展开时刻与出生地区） */
   useTrueSolar: boolean;
-  /** 出生地经度（东经为正），默认 120 */
-  longitude: number;
+  /** 出生地区（省/市/区三级，经度由此查表） */
+  province: string;
+  city: string;
+  district: string;
   /** 安星流派：通行版（南派）/ 中州派 */
   algorithm: "default" | "zhongzhou";
   /** 年分界：正月初一 / 立春（同时作用于运限分界） */
@@ -58,6 +61,8 @@ export type TrueSolarInfo = {
   offsetMinutes: number;
   eotMinutes: number;
   longitude: number;
+  /** 出生地区（省市区） */
+  place: string;
 };
 
 export type PickState = { year: number; month: number; day: number; hour: number };
@@ -97,7 +102,8 @@ export function useZwds(input: BirthInput) {
         ? lunarStrToSolarStr(input.date, input.isLeapMonth)
         : input.date;
     if (!solarStr) return base;
-    const adj = applyTrueSolar(solarStr, input.exactTime, input.longitude);
+    const longitude = getLongitude(input.province, input.city, input.district) ?? 120;
+    const adj = applyTrueSolar(solarStr, input.exactTime, longitude);
     if (!adj) return base;
     return {
       calendar: "solar" as const,
@@ -111,7 +117,11 @@ export function useZwds(input: BirthInput) {
         timeIndex: adj.timeIndex,
         offsetMinutes: adj.offsetMinutes,
         eotMinutes: adj.eotMinutes,
-        longitude: input.longitude,
+        longitude,
+        place:
+          input.province === input.city
+            ? `${input.city}${input.district}`
+            : `${input.province}${input.city}${input.district}`,
       },
     };
   }, [input]);

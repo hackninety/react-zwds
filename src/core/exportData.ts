@@ -2,9 +2,19 @@
  * AI 导出：把整张命盘 + 当前运限序列化为 JSON / Markdown，
  * 供用户下载后上传给 AI 推理（结构参照 react-iztro 的 astrolabeToJson 并扩展）。
  */
+import { util } from "iztro";
 import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
-import { MUTAGEN_CHARS, SCOPES, SCOPE_META, fixIndex, type Scope } from "./utils";
+import { MUTAGEN_CHARS, SCOPE_META, fixIndex, type Scope } from "./utils";
 import { lunarToSolarStr } from "./lunar";
+
+/** 本宫自化（离心）：宫干四化命中本宫主星/辅星 */
+function getSelfMutagens(p: Astrolabe["palaces"][number]) {
+  const table = util.getMutagensByHeavenlyStem(p.heavenlyStem) as string[];
+  const own = new Set([...p.majorStars, ...p.minorStars].map((s) => s.name as string));
+  return table
+    .map((star, k) => ({ star, mutagen: MUTAGEN_CHARS[k] }))
+    .filter((x) => own.has(x.star));
+}
 
 type AnyStar = {
   name: string;
@@ -94,7 +104,7 @@ export function buildExportData(z: Zwds) {
     school: schoolLabel(z.input.algorithm),
     yearDivide: z.input.yearDivide === "exact" ? "立春分界" : "正月初一分界",
     exportedAt: new Date().toISOString(),
-    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，各运限四化见 horoscope 对应层级。",
+    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。",
   };
 
   const input = {
@@ -141,6 +151,7 @@ export function buildExportData(z: Zwds) {
     suiqian12: p.suiqian12,
     decadal: p.decadal,
     ages: p.ages,
+    selfMutagens: getSelfMutagens(p),
   }));
 
   const horoscope = h
@@ -243,7 +254,7 @@ export function buildExportMd(z: Zwds): string | null {
   L.push(`| 出生时辰 | ${a.time}（${a.timeRange}） |`);
   if (z.trueSolar) {
     L.push(
-      `| 真太阳时 | ${z.trueSolar.trueDate} ${z.trueSolar.trueTime}（钟表 ${z.trueSolar.clockDate} ${z.trueSolar.clockTime}，经度 ${z.trueSolar.longitude}°，偏移 ${z.trueSolar.offsetMinutes.toFixed(1)} 分，其中均时差 ${z.trueSolar.eotMinutes.toFixed(1)} 分）→ 已按真太阳时排盘 |`
+      `| 真太阳时 | ${z.trueSolar.trueDate} ${z.trueSolar.trueTime}（出生地 ${z.trueSolar.place}，经度 ${z.trueSolar.longitude}°；钟表 ${z.trueSolar.clockDate} ${z.trueSolar.clockTime}，偏移 ${z.trueSolar.offsetMinutes.toFixed(1)} 分，其中均时差 ${z.trueSolar.eotMinutes.toFixed(1)} 分）→ 已按真太阳时排盘 |`
     );
   }
   L.push(`| 四柱干支 | ${a.chineseDate} |`);
@@ -268,6 +279,14 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(`- 主星：${starList(p.majorStars)}`);
     L.push(`- 辅星：${starList(p.minorStars)}`);
     L.push(`- 杂耀：${starList(p.adjectiveStars)}`);
+    const selfMuts = getSelfMutagens(p);
+    if (selfMuts.length) {
+      L.push(
+        `- 自化（宫干${p.heavenlyStem}四化入本宫·离心）：${selfMuts
+          .map((x) => `${x.star}化${x.mutagen}`)
+          .join("、")}`
+      );
+    }
     L.push(`- 长生十二神：${p.changsheng12}；博士十二神：${p.boshi12}`);
     L.push(`- 岁前十二神：${p.suiqian12}；将前十二神：${p.jiangqian12}`);
     L.push(`- 大限：${p.decadal.range.join("~")} 岁（${p.decadal.heavenlyStem}${p.decadal.earthlyBranch}）；小限岁数：${p.ages.join("、")}`);

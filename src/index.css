@@ -210,12 +210,24 @@ body {
   width: 96px;
 }
 
-.input-panel input.num {
-  width: 76px;
-}
-
 .input-panel select:disabled {
   opacity: 0.55;
+}
+
+/* 真太阳时展开行：时刻 + 省市区 */
+.ts-row {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.ts-lng {
+  color: var(--dim);
+  font-size: 0.72rem;
 }
 
 .seg {
@@ -480,6 +492,18 @@ body {
   border: 1px solid;
   line-height: 12px;
 }
+
+/* 自化：虚线框，按四化色 */
+.mut-self {
+  background: transparent;
+  border: 1px dashed;
+  line-height: 12px;
+}
+
+.mut-self[data-m="禄"] { border-color: var(--m-lu); color: var(--m-lu); }
+.mut-self[data-m="权"] { border-color: var(--m-quan); color: var(--m-quan); }
+.mut-self[data-m="科"] { border-color: var(--m-ke); color: var(--m-ke); }
+.mut-self[data-m="忌"] { border-color: var(--m-ji); color: var(--m-ji); }
 
 .mut-decadal { border-color: var(--c-decadal); color: var(--c-decadal); }
 .mut-yearly { border-color: var(--c-yearly); color: var(--c-yearly); }

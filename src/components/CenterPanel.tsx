@@ -62,8 +62,9 @@ export function CenterPanel({ z }: { z: Zwds }) {
         {ts && (
           <div className="ci ci-wide">
             <b>真太阳时</b>
-            <span title={`经度 ${ts.longitude}° · 均时差 ${ts.eotMinutes.toFixed(1)} 分`}>
-              {ts.trueDate} {ts.trueTime}（钟表 {ts.clockTime}，{ts.offsetMinutes >= 0 ? "+" : ""}
+            <span title={`出生地 ${ts.place} · 经度 ${ts.longitude}° · 均时差 ${ts.eotMinutes.toFixed(1)} 分`}>
+              {ts.place} · {ts.trueDate} {ts.trueTime}（钟表 {ts.clockTime}，
+              {ts.offsetMinutes >= 0 ? "+" : ""}
               {ts.offsetMinutes.toFixed(1)}分）
             </span>
           </div>

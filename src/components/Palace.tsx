@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { util } from "iztro";
 import { SCOPES, abbrPalace, fixIndex } from "../core/utils";
 import type { PalaceData, Zwds } from "../core/useZwds";
 import { StarCell } from "./StarCell";
@@ -16,6 +18,12 @@ export function PalaceCard({
 }) {
   const { horoscope, visible } = z;
   const i = palace.index;
+
+  /* 自化（离心）：宫干四化命中本宫星耀；跟随流派 config */
+  const selfMutagens = useMemo(
+    () => util.getMutagensByHeavenlyStem(palace.heavenlyStem) as string[],
+    [palace.heavenlyStem, z.input.algorithm]
+  );
 
   /* 运限宫名徽章：大官 / 年子 / 小田 / 月父 / 日疾 / 时兄 */
   const chips: { key: string; cls: string; text: string }[] = [];
@@ -64,10 +72,22 @@ export function PalaceCard({
       <div className="p-stars">
         <div className="p-major">
           {palace.majorStars.map((s) => (
-            <StarCell key={s.name} star={s} horoscope={horoscope} visible={visible} />
+            <StarCell
+              key={s.name}
+              star={s}
+              horoscope={horoscope}
+              visible={visible}
+              selfMutagens={selfMutagens}
+            />
           ))}
           {palace.minorStars.map((s) => (
-            <StarCell key={s.name} star={s} horoscope={horoscope} visible={visible} />
+            <StarCell
+              key={s.name}
+              star={s}
+              horoscope={horoscope}
+              visible={visible}
+              selfMutagens={selfMutagens}
+            />
           ))}
         </div>
         {palace.adjectiveStars.length > 0 && (

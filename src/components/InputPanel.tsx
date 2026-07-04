@@ -1,8 +1,14 @@
-import { FormEvent, useEffect, useState } from "react";
-import { TIME_OPTIONS, timeIndexFromClock } from "../core/utils";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { TIME_OPTIONS, applyTrueSolar } from "../core/utils";
+import {
+  ALL_PROVINCE_NAMES,
+  getCityNamesOfProvince,
+  getDistrictNamesOfCity,
+  getLongitude,
+} from "../core/cities";
 import type { BirthInput } from "../core/useZwds";
 
-/** 出生信息输入条：历法/日期/时辰/精确时刻/真太阳时/流派 */
+/** 出生信息输入条：历法/日期/时辰/真太阳时（时刻+省市区）/流派 */
 export function InputPanel({
   value,
   onApply,
@@ -17,19 +23,44 @@ export function InputPanel({
   const set = <K extends keyof BirthInput>(k: K, v: BirthInput[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
 
-  /** 填写精确时刻后自动同步时辰 */
-  const setExactTime = (t: string) => {
+  /** 勾选真太阳时：展开时刻+地区，未填时刻则默认 12:00 */
+  const toggleTrueSolar = (on: boolean) =>
+    setDraft((d) => ({
+      ...d,
+      useTrueSolar: on,
+      exactTime: on && !d.exactTime ? "12:00" : d.exactTime,
+    }));
+
+  /** 省 → 市 → 区 三级联动（复刻 react-iztro） */
+  const setProvince = (p: string) =>
     setDraft((d) => {
-      const next = { ...d, exactTime: t };
-      if (t) {
-        const hour = Number(t.split(":")[0]);
-        if (!isNaN(hour)) next.timeIndex = timeIndexFromClock(hour);
-      } else {
-        next.useTrueSolar = false;
-      }
-      return next;
+      const cities = getCityNamesOfProvince(p);
+      const city = cities[0] ?? "";
+      const districts = getDistrictNamesOfCity(p, city);
+      return { ...d, province: p, city, district: districts[0] ?? "" };
     });
-  };
+
+  const setCity = (c: string) =>
+    setDraft((d) => {
+      const districts = getDistrictNamesOfCity(d.province, c);
+      return { ...d, city: c, district: districts[0] ?? "" };
+    });
+
+  const cityNames = useMemo(() => getCityNamesOfProvince(draft.province), [draft.province]);
+  const districtNames = useMemo(
+    () => getDistrictNamesOfCity(draft.province, draft.city),
+    [draft.province, draft.city]
+  );
+  const longitude = useMemo(
+    () => getLongitude(draft.province, draft.city, draft.district),
+    [draft.province, draft.city, draft.district]
+  );
+
+  /** 真太阳时下预览推定的时辰（农历输入时以原始日期近似，仅供显示） */
+  const derivedIdx = useMemo(() => {
+    if (!draft.useTrueSolar || !draft.exactTime) return null;
+    return applyTrueSolar(draft.date, draft.exactTime, longitude ?? 120)?.timeIndex ?? null;
+  }, [draft.useTrueSolar, draft.exactTime, draft.date, longitude]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -104,9 +135,9 @@ export function InputPanel({
       <label className="fld">
         <span>时辰</span>
         <select
-          value={draft.timeIndex}
-          disabled={!!draft.exactTime}
-          title={draft.exactTime ? "已由精确时刻自动推定" : undefined}
+          value={derivedIdx ?? draft.timeIndex}
+          disabled={derivedIdx != null}
+          title={derivedIdx != null ? "已由真太阳时校正自动推定" : undefined}
           onChange={(e) => set("timeIndex", Number(e.target.value))}
         >
           {TIME_OPTIONS.map((t) => (
@@ -116,42 +147,6 @@ export function InputPanel({
           ))}
         </select>
       </label>
-
-      <label className="fld">
-        <span>时刻</span>
-        <input
-          type="time"
-          value={draft.exactTime}
-          onChange={(e) => setExactTime(e.target.value)}
-          title="精确出生时刻（可选，填写后自动推定时辰；启用真太阳时必填）"
-        />
-      </label>
-
-      <label className="ck" title="按出生地经度与均时差校正为真太阳时排盘（输入按东八区钟表时间解释）">
-        <input
-          type="checkbox"
-          checked={draft.useTrueSolar}
-          disabled={!draft.exactTime}
-          onChange={(e) => set("useTrueSolar", e.target.checked)}
-        />
-        真太阳时
-      </label>
-
-      {draft.useTrueSolar && (
-        <label className="fld">
-          <span>经度</span>
-          <input
-            className="num"
-            type="number"
-            step="0.01"
-            min={-180}
-            max={180}
-            value={draft.longitude}
-            onChange={(e) => set("longitude", Number(e.target.value))}
-            title="出生地经度，东经为正（如北京 116.40）"
-          />
-        </label>
-      )}
 
       <label className="fld">
         <span>流派</span>
@@ -177,9 +172,71 @@ export function InputPanel({
         </select>
       </label>
 
+      <label className="ck" title="按出生地经度与均时差校正为真太阳时排盘（输入按东八区钟表时间解释）">
+        <input
+          type="checkbox"
+          checked={draft.useTrueSolar}
+          onChange={(e) => toggleTrueSolar(e.target.checked)}
+        />
+        真太阳时
+      </label>
+
       <button type="submit" className="btn-go">
         起 盘
       </button>
+
+      {draft.useTrueSolar && (
+        <div className="ts-row">
+          <label className="fld">
+            <span>出生时刻</span>
+            <input
+              type="time"
+              required
+              value={draft.exactTime}
+              onChange={(e) => set("exactTime", e.target.value)}
+            />
+          </label>
+
+          <label className="fld">
+            <span>省份</span>
+            <select value={draft.province} onChange={(e) => setProvince(e.target.value)}>
+              {ALL_PROVINCE_NAMES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="fld">
+            <span>城市</span>
+            <select value={draft.city} onChange={(e) => setCity(e.target.value)}>
+              {cityNames.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="fld">
+            <span>区县</span>
+            <select value={draft.district} onChange={(e) => set("district", e.target.value)}>
+              {districtNames.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {longitude != null && (
+            <span className="ts-lng">
+              经度 {longitude}° · 经度偏移 {Math.round((longitude - 120) * 4)} 分（另含均时差）
+            </span>
+          )}
+        </div>
+      )}
     </form>
   );
 }
