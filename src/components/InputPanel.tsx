@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { TIME_OPTIONS, applyTrueSolar } from "../core/utils";
+import { SCHOOL_YEAR_DIVIDE, TIME_OPTIONS, applyTrueSolar } from "../core/utils";
 import {
   ALL_PROVINCE_NAMES,
   getCityNamesOfProvince,
@@ -22,6 +22,15 @@ export function InputPanel({
 
   const set = <K extends keyof BirthInput>(k: K, v: BirthInput[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
+
+  /** 切流派：年界自动跟随该派岁首默认（南派=正月初一，中州派=立春），盘型回天盘 */
+  const setAlgorithm = (alg: BirthInput["algorithm"]) =>
+    setDraft((d) => ({
+      ...d,
+      algorithm: alg,
+      yearDivide: SCHOOL_YEAR_DIVIDE[alg],
+      astroType: alg === "zhongzhou" ? d.astroType : "heaven",
+    }));
 
   /** 勾选真太阳时：展开时刻+地区，未填时刻则默认 12:00 */
   const toggleTrueSolar = (on: boolean) =>
@@ -152,8 +161,8 @@ export function InputPanel({
         <span>流派</span>
         <select
           value={draft.algorithm}
-          onChange={(e) => set("algorithm", e.target.value as BirthInput["algorithm"])}
-          title="安星流派（iztro 仅此两派，默认通行版即南派三合体系）"
+          onChange={(e) => setAlgorithm(e.target.value as BirthInput["algorithm"])}
+          title="安星流派（iztro 仅此两派，默认通行版即南派三合体系）；切换时年界自动套用该派岁首"
         >
           <option value="default">通行版（南派）</option>
           <option value="zhongzhou">中州派</option>
@@ -165,12 +174,31 @@ export function InputPanel({
         <select
           value={draft.yearDivide}
           onChange={(e) => set("yearDivide", e.target.value as BirthInput["yearDivide"])}
-          title="年与运限的分界点"
+          title="年与运限的分界点。派内默认：南派=正月初一，中州派=立春；可手动覆盖"
         >
-          <option value="normal">正月初一</option>
-          <option value="exact">立春</option>
+          <option value="normal">
+            正月初一{draft.algorithm === "default" ? "（南派默认）" : ""}
+          </option>
+          <option value="exact">
+            立春{draft.algorithm === "zhongzhou" ? "（中州默认）" : ""}
+          </option>
         </select>
       </label>
+
+      {draft.algorithm === "zhongzhou" && (
+        <label className="fld">
+          <span>盘型</span>
+          <select
+            value={draft.astroType}
+            onChange={(e) => set("astroType", e.target.value as BirthInput["astroType"])}
+            title="中州派特有：天盘=本命盘；地盘=以身宫干支起五行局重排；人盘=以福德宫干支起五行局重排"
+          >
+            <option value="heaven">天盘</option>
+            <option value="earth">地盘</option>
+            <option value="human">人盘</option>
+          </select>
+        </label>
+      )}
 
       <label className="ck" title="按出生地经度与均时差校正为真太阳时排盘（输入按东八区钟表时间解释）">
         <input

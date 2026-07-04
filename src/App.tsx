@@ -3,6 +3,7 @@ import { useZwds, BirthInput } from "./core/useZwds";
 import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { downloadJson, downloadMd } from "./core/exportData";
 
 const STORAGE_KEY = "zwds-input";
@@ -21,6 +22,7 @@ const DEFAULT_INPUT: BirthInput = {
   district: "市区",
   algorithm: "default",
   yearDivide: "normal",
+  astroType: "heaven",
 };
 
 function loadInput(): BirthInput {
@@ -76,10 +78,10 @@ export default function App() {
       <InputPanel value={input} onApply={apply} />
 
       {z.astrolabe ? (
-        <>
+        <ErrorBoundary>
           <Chart z={z} />
           <HoroscopeBar z={z} />
-        </>
+        </ErrorBoundary>
       ) : (
         <div className="err-box">
           排盘失败：请检查出生日期与时辰（支持 1900 ~ 2100 年，农历请勿超出当月天数）。

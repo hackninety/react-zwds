@@ -48,8 +48,10 @@ export type BirthInput = {
   district: string;
   /** 安星流派：通行版（南派）/ 中州派 */
   algorithm: "default" | "zhongzhou";
-  /** 年分界：正月初一 / 立春（同时作用于运限分界） */
+  /** 年分界：正月初一 / 立春（同时作用于运限分界）；随流派自动预设，可手动覆盖 */
   yearDivide: "normal" | "exact";
+  /** 盘型（中州派特有）：天盘 / 地盘（身宫起局重排）/ 人盘（福德宫起局重排） */
+  astroType: "heaven" | "earth" | "human";
 };
 
 export type TrueSolarInfo = {
@@ -85,6 +87,11 @@ export type CellHour = { hour: number; label: string; gz: string };
 function initPick(): PickState {
   const t = todayLunar();
   return { year: t.year, month: t.month, day: t.day, hour: t.hour };
+}
+
+/** 拨盘年份不早于出生农历年 */
+function clampPick(p: PickState, birthLunarYear: number): PickState {
+  return p.year < birthLunarYear ? { ...p, year: birthLunarYear } : p;
 }
 
 export function useZwds(input: BirthInput) {
@@ -128,28 +135,34 @@ export function useZwds(input: BirthInput) {
 
   const astrolabe = useMemo<Astrolabe | null>(() => {
     try {
-      astro.config({ algorithm: input.algorithm, yearDivide: input.yearDivide, horoscopeDivide: input.yearDivide });
-      return effective.calendar === "lunar"
-        ? astro.byLunar(
-            effective.dateStr,
-            effective.timeIndex,
-            input.gender as unknown as GenderName,
-            input.isLeapMonth,
-            true,
-            "zh-CN"
-          )
-        : astro.bySolar(
-            effective.dateStr,
-            effective.timeIndex,
-            input.gender as unknown as GenderName,
-            true,
-            "zh-CN"
-          );
+      return astro.withOptions({
+        type: effective.calendar,
+        dateStr: effective.dateStr,
+        timeIndex: effective.timeIndex,
+        gender: input.gender as unknown as GenderName,
+        isLeapMonth: input.isLeapMonth,
+        fixLeap: true,
+        language: "zh-CN",
+        // 地盘/人盘为中州派特有，通行版强制天盘
+        astroType: input.algorithm === "zhongzhou" ? input.astroType : "heaven",
+        config: {
+          algorithm: input.algorithm,
+          yearDivide: input.yearDivide,
+          horoscopeDivide: input.yearDivide,
+        },
+      });
     } catch (e) {
       console.error("[zwds] 排盘失败", e);
       return null;
     }
-  }, [effective, input.gender, input.isLeapMonth, input.algorithm, input.yearDivide]);
+  }, [
+    effective,
+    input.gender,
+    input.isLeapMonth,
+    input.algorithm,
+    input.yearDivide,
+    input.astroType,
+  ]);
 
   const birthLunarYear = astrolabe?.rawDates.lunarDate.lunarYear ?? new Date().getFullYear();
 
@@ -189,10 +202,10 @@ export function useZwds(input: BirthInput) {
     hourly: false,
   });
 
-  // 换盘后回到今天
+  // 换盘后回到今天（不早于出生年，避免出生前无效运限）
   useEffect(() => {
-    setPick(initPick());
-  }, [astrolabe]);
+    setPick(clampPick(initPick(), birthLunarYear));
+  }, [astrolabe, birthLunarYear]);
 
   /** 当前流年所落的大限序号；-1 = 童限 */
   const activeDecadeIdx = useMemo(() => {
@@ -302,7 +315,7 @@ export function useZwds(input: BirthInput) {
       show("hourly");
     },
     resetToday() {
-      setPick(initPick());
+      setPick(clampPick(initPick(), birthLunarYear));
     },
     toggleScope(s: Scope) {
       setVisible((v) => ({ ...v, [s]: !v[s] }));

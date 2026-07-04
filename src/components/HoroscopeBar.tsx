@@ -55,15 +55,17 @@ function Cell({
   scope,
   active,
   onClick,
+  title,
 }: {
   main: string;
   sub?: string;
   scope: Scope;
   active: boolean;
   onClick: () => void;
+  title?: string;
 }) {
   return (
-    <button className={`hcell ${active ? `on on-${scope}` : ""}`} onClick={onClick}>
+    <button className={`hcell ${active ? `on on-${scope}` : ""}`} onClick={onClick} title={title}>
       <b>{main}</b>
       {sub ? <i>{sub}</i> : null}
     </button>
@@ -89,6 +91,7 @@ export function HoroscopeBar({ z }: { z: Zwds }) {
             scope="decadal"
             active={activeDecadeIdx === -1}
             onClick={() => actions.pickDecade(-1)}
+            title={`${childhood.startYear}~${childhood.endYear}年`}
           />
         )}
         {decades.map((d, k) => (
@@ -99,6 +102,7 @@ export function HoroscopeBar({ z }: { z: Zwds }) {
             scope="decadal"
             active={activeDecadeIdx === k}
             onClick={() => actions.pickDecade(k)}
+            title={`公历 ${d.startYear}~${d.endYear} 年`}
           />
         ))}
       </Row>

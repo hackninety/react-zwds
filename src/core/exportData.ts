@@ -103,6 +103,12 @@ export function buildExportData(z: Zwds) {
     engine: "iztro (https://github.com/SylarLong/iztro)",
     school: schoolLabel(z.input.algorithm),
     yearDivide: z.input.yearDivide === "exact" ? "立春分界" : "正月初一分界",
+    astroType:
+      z.input.algorithm !== "zhongzhou" || z.input.astroType === "heaven"
+        ? "天盘"
+        : z.input.astroType === "earth"
+          ? "地盘（身宫起局重排）"
+          : "人盘（福德宫起局重排）",
     exportedAt: new Date().toISOString(),
     note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。",
   };
@@ -236,9 +242,13 @@ export function buildExportMd(z: Zwds): string | null {
 
   L.push(`# 紫微斗数命盘（AI 分析用）`);
   L.push("");
+  const astroTypeLabel =
+    z.input.algorithm === "zhongzhou" && z.input.astroType !== "heaven"
+      ? ` · 盘型：${z.input.astroType === "earth" ? "地盘（身宫起局重排）" : "人盘（福德宫起局重排）"}`
+      : "";
   L.push(`> 排盘引擎：iztro · 安星流派：**${schoolLabel(z.input.algorithm)}** · 年/运限分界：${
     z.input.yearDivide === "exact" ? "立春" : "正月初一"
-  } · 导出时间：${new Date().toLocaleString("zh-CN")}`);
+  }${astroTypeLabel} · 导出时间：${new Date().toLocaleString("zh-CN")}`);
   L.push(`> 星名后括号为亮度（庙旺得利平不陷），【生年X】为生年四化；各运限四化在对应章节单列。`);
   L.push("");
 

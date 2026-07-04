@@ -85,6 +85,17 @@ export const SCOPE_META: Record<Scope, { label: string; prefix: string; rowLabel
 
 export const MUTAGEN_CHARS = ["禄", "权", "科", "忌"] as const;
 
+/**
+ * 各流派的岁首（年分界）默认值：
+ * - 通行版/南派三合（《全书》体系）：全盘以农历为本，年以正月初一为界（iztro 默认同此）
+ * - 中州派（王亭之）：主张以立春为岁首
+ * 用户仍可在「年界」中手动覆盖。
+ */
+export const SCHOOL_YEAR_DIVIDE = {
+  default: "normal",
+  zhongzhou: "exact",
+} as const satisfies Record<string, "normal" | "exact">;
+
 /** 阳干判断（甲丙戊庚壬） */
 export function isYangStem(stem: string): boolean {
   const i = STEMS.indexOf(stem as (typeof STEMS)[number]);
