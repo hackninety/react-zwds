@@ -59,6 +59,12 @@ export function CenterPanel({ z }: { z: Zwds }) {
             {a.zodiac} · {a.sign}
           </span>
         </div>
+        {z.input.residence && (
+          <div className="ci">
+            <b>常居</b>
+            <span title="常居住地：不参与排盘，随 AI 导出供地域参考">{z.input.residence}</span>
+          </div>
+        )}
         {ts && (
           <div className="ci ci-wide">
             <b>真太阳时</b>

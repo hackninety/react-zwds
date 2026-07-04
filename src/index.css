@@ -210,6 +210,10 @@ body {
   width: 96px;
 }
 
+.input-panel input.residence {
+  width: 132px;
+}
+
 .input-panel select:disabled {
   opacity: 0.55;
 }

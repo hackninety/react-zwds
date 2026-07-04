@@ -23,6 +23,7 @@ const DEFAULT_INPUT: BirthInput = {
   algorithm: "default",
   yearDivide: "normal",
   astroType: "heaven",
+  residence: "",
 };
 
 function loadInput(): BirthInput {

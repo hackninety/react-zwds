@@ -161,6 +161,7 @@ export function HoroscopeBar({ z }: { z: Zwds }) {
             scope="daily"
             active={clampedDay === d.day}
             onClick={() => actions.pickDay(d.day)}
+            title={d.gz ? `${d.label} · ${d.gz}日` : d.label}
           />
         ))}
       </Row>

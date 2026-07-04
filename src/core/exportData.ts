@@ -122,6 +122,8 @@ export function buildExportData(z: Zwds) {
     isLeapMonth: z.input.isLeapMonth,
     exactTime: z.input.exactTime || null,
     trueSolar: z.trueSolar,
+    /** 常居住地：不参与排盘，供 AI 结合地域背景（气候、方位、迁移）辅助分析 */
+    residence: z.input.residence || null,
   };
 
   const basic = {
@@ -274,6 +276,8 @@ export function buildExportMd(z: Zwds): string | null {
   const origin = a.palaces.find((p) => p.isOriginalPalace);
   if (origin) L.push(`| 来因宫 | ${origin.name}（${origin.earthlyBranch}） |`);
   L.push(`| 生肖 / 星座 | ${a.zodiac} / ${a.sign} |`);
+  if (z.input.residence)
+    L.push(`| 常居住地 | ${z.input.residence}（不参与排盘，供地域/方位/迁移背景参考） |`);
   L.push("");
 
   /* 二、十二宫详情（命宫起，逆布） */
@@ -382,7 +386,11 @@ export function buildExportMd(z: Zwds): string | null {
   L.push(`## 六、使用说明`);
   L.push("");
   L.push(
-    `将本文件整体提供给 AI，并附上您的问题（如性格、事业、婚姻、某年吉凶等）。分析时请 AI 严格依照本文件数据与 meta 中标注的流派口径推理，不要自行改星改宫。`
+    `将本文件整体提供给 AI，并附上您的问题（如性格、事业、婚姻、某年吉凶等）。分析时请 AI 严格依照本文件数据与 meta 中标注的流派口径推理，不要自行改星改宫。${
+      z.input.residence
+        ? `命主常居住地为「${z.input.residence}」，涉及迁移（迁移宫）、方位喜忌、异地发展等议题时可结合参考。`
+        : ""
+    }`
   );
   L.push("");
 

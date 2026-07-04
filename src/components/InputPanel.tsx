@@ -88,6 +88,18 @@ export function InputPanel({
         />
       </label>
 
+      <label className="fld">
+        <span>常居地</span>
+        <input
+          className="residence"
+          value={draft.residence}
+          onChange={(e) => set("residence", e.target.value)}
+          placeholder="可选，如 广东深圳"
+          maxLength={24}
+          title="常居住地（可选）：不参与排盘，随 AI 导出提供地域背景，增强分析"
+        />
+      </label>
+
       <div className="seg" role="group" aria-label="性别">
         {(["男", "女"] as const).map((g) => (
           <button

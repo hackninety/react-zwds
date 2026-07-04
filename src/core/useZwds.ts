@@ -52,6 +52,8 @@ export type BirthInput = {
   yearDivide: "normal" | "exact";
   /** 盘型（中州派特有）：天盘 / 地盘（身宫起局重排）/ 人盘（福德宫起局重排） */
   astroType: "heaven" | "earth" | "human";
+  /** 常居住地（可选，不参与排盘，随导出供 AI 做地域/方位参考） */
+  residence: string;
 };
 
 export type TrueSolarInfo = {
