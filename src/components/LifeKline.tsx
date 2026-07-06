@@ -24,30 +24,11 @@ export function LifeKline({ z }: { z: Zwds }) {
   return <KlineInner data={data} z={z} />;
 }
 
-const KLINE_TAB_KEY = "zwds-kline-domain";
-
 function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
-  const [domainKey, setDomainKey] = useState(() => {
-    try {
-      const saved = localStorage.getItem(KLINE_TAB_KEY);
-      if (saved && data.domains.some((d) => d.key === saved)) return saved;
-    } catch {
-      /* ignore */
-    }
-    return data.domains[0].key;
-  });
+  const [domainKey, setDomainKey] = useState(data.domains[0].key);
   const [hover, setHover] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const curYear = useMemo(() => todayLunar().year, []);
-
-  // 记住所选域，刷新恢复
-  useEffect(() => {
-    try {
-      localStorage.setItem(KLINE_TAB_KEY, domainKey);
-    } catch {
-      /* ignore */
-    }
-  }, [domainKey]);
 
   const domain: KlineDomain =
     data.domains.find((d) => d.key === domainKey) ?? data.domains[0];

@@ -9,6 +9,14 @@ import { downloadJson, downloadMd } from "./core/exportData";
 
 const STORAGE_KEY = "zwds-input-v2";
 
+// 清理旧版拨盘/K线持久化：现仅存起盘参数，拨盘信息不再持久化
+try {
+  localStorage.removeItem("zwds-nav-v1");
+  localStorage.removeItem("zwds-kline-domain");
+} catch {
+  /* ignore */
+}
+
 const DEFAULT_INPUT: BirthInput = {
   name: "演示",
   gender: "男",

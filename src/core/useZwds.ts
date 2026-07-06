@@ -2,7 +2,7 @@
  * 排盘主 Hook：iztro 负责全部命理计算，这里负责
  * 「大限/流年/流月/流日/流时」拨盘状态 → 目标公历日期 → horoscope。
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { astro } from "iztro";
 import type { GenderName } from "iztro/lib/i18n";
 import {
@@ -105,33 +105,6 @@ const DEFAULT_VISIBLE: ScopeVisible = {
   hourly: false,
 };
 
-/** 拨盘导航状态持久化（与出生输入分开存储，避免刷新丢失所看运限位置） */
-const NAV_KEY = "zwds-nav-v1";
-
-function isValidPick(p: unknown): p is PickState {
-  return (
-    !!p &&
-    typeof p === "object" &&
-    ["year", "month", "day", "hour"].every(
-      (k) => typeof (p as Record<string, unknown>)[k] === "number"
-    )
-  );
-}
-
-function loadNav(): { pick?: PickState; visible?: ScopeVisible } {
-  try {
-    const s = localStorage.getItem(NAV_KEY);
-    if (!s) return {};
-    const parsed = JSON.parse(s) as { pick?: unknown; visible?: Partial<ScopeVisible> };
-    return {
-      pick: isValidPick(parsed.pick) ? parsed.pick : undefined,
-      visible: parsed.visible ? { ...DEFAULT_VISIBLE, ...parsed.visible } : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
-
 export function useZwds(input: BirthInput) {
   /** 真太阳时校正后的实际排盘参数 */
   const effective = useMemo(() => {
@@ -231,31 +204,14 @@ export function useZwds(input: BirthInput) {
     };
   }, [decades, birthLunarYear]);
 
-  // 首次挂载时从存储恢复拨盘导航（刷新不丢所看运限位置）
-  const savedNav = useRef(loadNav()).current;
-  const [pick, setPick] = useState<PickState>(() =>
-    savedNav.pick ? clampPick(savedNav.pick, birthLunarYear) : initPick()
-  );
-  const [visible, setVisible] = useState<ScopeVisible>(() => savedNav.visible ?? DEFAULT_VISIBLE);
+  // 拨盘导航不持久化：命盘由存储的起盘参数直接渲染，拨盘位置每次刷新/起盘回默认（今天）
+  const [pick, setPick] = useState<PickState>(initPick);
+  const [visible, setVisible] = useState<ScopeVisible>(DEFAULT_VISIBLE);
 
-  // 仅在真正换盘（起盘/改输入致 astrolabe 变化）时回到今天；
-  // 首次挂载与刷新恢复不重置，保留存储中的拨盘位置。
-  const prevAstro = useRef(astrolabe);
+  // 换盘（起盘/改输入致 astrolabe 变化）或刷新挂载后回到今天（不早于出生年）
   useEffect(() => {
-    if (prevAstro.current !== astrolabe) {
-      prevAstro.current = astrolabe;
-      setPick(clampPick(initPick(), birthLunarYear));
-    }
+    setPick(clampPick(initPick(), birthLunarYear));
   }, [astrolabe, birthLunarYear]);
-
-  // 拨盘状态持久化
-  useEffect(() => {
-    try {
-      localStorage.setItem(NAV_KEY, JSON.stringify({ pick, visible }));
-    } catch {
-      /* ignore */
-    }
-  }, [pick, visible]);
 
   /** 当前流年所落的大限序号；-1 = 童限 */
   const activeDecadeIdx = useMemo(() => {
