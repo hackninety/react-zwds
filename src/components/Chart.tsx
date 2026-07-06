@@ -26,7 +26,7 @@ function anchor(i: number): { x: number; y: number } {
 }
 
 /** 星盘：十二宫 + 中宫 + 三方四正发光连线 */
-export function Chart({ z }: { z: Zwds }) {
+export function Chart({ z, genId = 0 }: { z: Zwds; genId?: number }) {
   const a = z.astrolabe;
 
   /* 默认自动选中命宫：流时>流日>流月>流年>大限的命宫，全关则本命命宫 */
@@ -41,10 +41,10 @@ export function Chart({ z }: { z: Zwds }) {
 
   const [userFocus, setUserFocus] = useState<number | null>(null);
 
-  // 运限选择变化后，回到自动聚焦
+  // 运限选择变化、或每次起盘（genId 变化）后，回到默认命宫聚焦
   useEffect(() => {
     setUserFocus(null);
-  }, [autoFocus]);
+  }, [autoFocus, genId]);
 
   const focus = userFocus ?? autoFocus;
   const handleFocus = (i: number) => setUserFocus(i === focus ? null : i);

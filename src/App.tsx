@@ -7,11 +7,11 @@ import { LifeKline } from "./components/LifeKline";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { downloadJson, downloadMd } from "./core/exportData";
 
-const STORAGE_KEY = "zwds-input";
+const STORAGE_KEY = "zwds-input-v2";
 
 const DEFAULT_INPUT: BirthInput = {
   name: "演示",
-  gender: "女",
+  gender: "男",
   calendar: "solar",
   date: "2000-08-16",
   timeIndex: 2,
@@ -39,10 +39,13 @@ function loadInput(): BirthInput {
 
 export default function App() {
   const [input, setInput] = useState<BirthInput>(loadInput);
+  // 每次起盘自增，用于强制盘面回到默认命宫位置（即使命宫索引与上一盘相同）
+  const [genId, setGenId] = useState(0);
   const z = useZwds(input);
 
   const apply = (v: BirthInput) => {
     setInput(v);
+    setGenId((g) => g + 1);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
     } catch {
@@ -81,7 +84,7 @@ export default function App() {
 
       {z.astrolabe ? (
         <ErrorBoundary>
-          <Chart z={z} />
+          <Chart z={z} genId={genId} />
           <HoroscopeBar z={z} />
           <LifeKline z={z} />
         </ErrorBoundary>
