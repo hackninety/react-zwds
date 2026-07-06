@@ -183,7 +183,38 @@ export function buildExportData(z: Zwds) {
       }
     : null;
 
-  return { meta, input, basic, palaces, horoscope, lifeKline: z.lifeKline };
+  return { meta, input, basic, palaces, horoscope, lifeKline: serializeLifeKline(z) };
+}
+
+/** 人生K线导出：紧凑逐年序列 + 各域高光/低谷（带计分原因） */
+function serializeLifeKline(z: Zwds) {
+  const lk = z.lifeKline;
+  if (!lk?.domains.length) return null;
+  const domains = lk.domains.map((d) => {
+    const sorted = [...d.years].sort((a, b) => b.score - a.score);
+    const pick = (y: (typeof d.years)[number]) => ({
+      year: y.year,
+      ganZhi: y.ganZhi,
+      age: y.age,
+      score: y.score,
+      factors: y.factors,
+    });
+    const cur = d.years.find((y) => y.year === z.pick.year);
+    return {
+      palaceName: d.palaceName,
+      label: d.label,
+      earthlyBranch: d.branch,
+      isBodyPalace: d.isBody,
+      baseline: d.baseline,
+      sanfangsizheng: d.compose,
+      decadeAvg: d.decadeAvg,
+      series: d.years.map((y) => ({ year: y.year, age: y.age, score: y.score, delta: y.delta })),
+      highlights: sorted.slice(0, 3).map(pick),
+      lowlights: sorted.slice(-3).reverse().map(pick),
+      currentYear: cur ? pick(cur) : null,
+    };
+  });
+  return { note: lk.note, domains };
 }
 
 /* ─────────────── Markdown ─────────────── */
@@ -383,32 +414,43 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
   }
 
-  /* 六、人生K线（量化参考） */
+  /* 六、人生K线（分域量化参考） */
   const lk = z.lifeKline;
-  if (lk?.years.length) {
-    L.push(`## 六、人生K线（量化参考）`);
+  if (lk?.domains.length) {
+    L.push(`## 六、人生K线（分域量化参考）`);
     L.push("");
     L.push(`> ${lk.note}`);
     L.push("");
-    L.push(`| 大限段 | 年份区间 | 段内均分 |`);
-    L.push(`|---|---|---|`);
-    for (const d of lk.decades) {
-      L.push(`| ${d.label} | ${d.startYear}~${d.endYear} | ${d.avg} |`);
+    L.push(`### 各域概览（十二宫）`);
+    L.push("");
+    L.push(`| 域（宫·支） | 三方四正 | 基调 | 高光年（分） | 低谷年（分） | 当前${z.pick.year}年 |`);
+    L.push(`|---|---|---|---|---|---|`);
+    for (const d of lk.domains) {
+      const sorted = [...d.years].sort((a, b) => b.score - a.score);
+      const top = sorted[0];
+      const bot = sorted[sorted.length - 1];
+      const cur = d.years.find((y) => y.year === z.pick.year);
+      const bodyMark = d.isBody ? "·身" : "";
+      L.push(
+        `| ${d.label}（${d.palaceName}${d.branch}${bodyMark}） | ${d.compose} | ${
+          d.baseline >= 0 ? "+" : ""
+        }${d.baseline} | ${top ? `${top.year}(${top.score})` : "-"} | ${
+          bot ? `${bot.year}(${bot.score})` : "-"
+        } | ${cur ? `${cur.score}` : "-"} |`
+      );
     }
     L.push("");
-    const sorted = [...lk.years].sort((a, b) => b.score - a.score);
-    const fmtYear = (y: (typeof lk.years)[number]) =>
-      `${y.year} ${y.ganZhi}（${y.age}岁，${y.score}分：${y.factors.slice(0, 3).join("；") || "平年"}）`;
-    L.push(`- 高光年份 TOP5：`);
-    for (const y of sorted.slice(0, 5)) L.push(`  - ${fmtYear(y)}`);
-    L.push(`- 低谷年份 TOP5：`);
-    for (const y of sorted.slice(-5).reverse()) L.push(`  - ${fmtYear(y)}`);
-    const cur = lk.years.find((y) => y.year === z.pick.year);
+    L.push(`> 说明：命-财帛-官禄同属一三合三角,三条线会同步（命财官不分家）；夫妻/迁移/福德、兄弟/疾厄/田宅、子女/交友/父母各自成组,与综合分化。身宫所在宫已在基调 +2 并标「身」。`);
+    L.push("");
+    const overall = lk.domains.find((d) => d.palaceName === "命宫") ?? lk.domains[0];
+    const cur = overall.years.find((y) => y.year === z.pick.year);
     if (cur) {
-      L.push(`- 当前观测年 ${cur.year} ${cur.ganZhi}：${cur.score} 分（较上年 ${cur.delta >= 0 ? "+" : ""}${cur.delta}）`);
-      for (const f of cur.factors) L.push(`  - ${f}`);
+      L.push(`### 综合（命宫）当前 ${cur.year} ${cur.ganZhi} 明细`);
+      L.push("");
+      L.push(`- ${cur.score} 分（较上年 ${cur.delta >= 0 ? "+" : ""}${cur.delta}）`);
+      for (const f of cur.factors.length ? cur.factors : ["平年（三方四正无显著引动）"]) L.push(`  - ${f}`);
+      L.push("");
     }
-    L.push("");
   }
 
   L.push(`## 七、使用说明`);

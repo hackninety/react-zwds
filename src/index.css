@@ -998,6 +998,57 @@ body {
   margin-right: 8px;
 }
 
+/* 域页签（十二宫） */
+.kline-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 4px;
+}
+
+.kline-tab {
+  position: relative;
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(96, 165, 250, 0.16);
+  background: rgba(13, 20, 40, 0.5);
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: border-color 0.16s, color 0.16s, box-shadow 0.16s, background 0.16s;
+}
+
+.kline-tab:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.kline-tab.on {
+  color: #eaf3ff;
+  border-color: rgba(85, 215, 255, 0.6);
+  background: rgba(85, 215, 255, 0.14);
+  box-shadow: 0 0 12px rgba(85, 215, 255, 0.32);
+}
+
+.kline-tab-body {
+  font-style: normal;
+  margin-left: 3px;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 9px;
+  color: #2b0716;
+  background: linear-gradient(135deg, #ff77b7, #ff9db8);
+  box-shadow: 0 0 6px rgba(255, 119, 183, 0.55);
+}
+
+.kline-sub {
+  margin: 0 0 4px;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
 .kline-scroll {
   overflow-x: auto;
   padding-bottom: 2px;
