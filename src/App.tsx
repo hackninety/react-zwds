@@ -3,6 +3,7 @@ import { useZwds, BirthInput } from "./core/useZwds";
 import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
+import { LifeKline } from "./components/LifeKline";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { downloadJson, downloadMd } from "./core/exportData";
 
@@ -82,6 +83,7 @@ export default function App() {
         <ErrorBoundary>
           <Chart z={z} />
           <HoroscopeBar z={z} />
+          <LifeKline z={z} />
         </ErrorBoundary>
       ) : (
         <div className="err-box">

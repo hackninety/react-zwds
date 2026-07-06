@@ -24,6 +24,7 @@ import {
   todayLunar,
 } from "./lunar";
 import { getLongitude } from "./cities";
+import { buildLifeKline } from "./lifeKline";
 
 export type Astrolabe = ReturnType<typeof astro.bySolar>;
 export type Horoscope = ReturnType<Astrolabe["horoscope"]>;
@@ -333,6 +334,12 @@ export function useZwds(input: BirthInput) {
     [astrolabe]
   );
 
+  /** 人生K线（确定性量化，随盘重算） */
+  const lifeKline = useMemo(
+    () => buildLifeKline(astrolabe, decades, birthLunarYear),
+    [astrolabe, decades, birthLunarYear]
+  );
+
   return {
     input,
     astrolabe,
@@ -352,6 +359,7 @@ export function useZwds(input: BirthInput) {
     targetSolar,
     trueSolar: effective.trueSolar,
     soulPalaceIndex,
+    lifeKline,
     actions,
   };
 }

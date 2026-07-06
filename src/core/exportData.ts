@@ -183,7 +183,7 @@ export function buildExportData(z: Zwds) {
       }
     : null;
 
-  return { meta, input, basic, palaces, horoscope };
+  return { meta, input, basic, palaces, horoscope, lifeKline: z.lifeKline };
 }
 
 /* ─────────────── Markdown ─────────────── */
@@ -383,7 +383,35 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
   }
 
-  L.push(`## 六、使用说明`);
+  /* 六、人生K线（量化参考） */
+  const lk = z.lifeKline;
+  if (lk?.years.length) {
+    L.push(`## 六、人生K线（量化参考）`);
+    L.push("");
+    L.push(`> ${lk.note}`);
+    L.push("");
+    L.push(`| 大限段 | 年份区间 | 段内均分 |`);
+    L.push(`|---|---|---|`);
+    for (const d of lk.decades) {
+      L.push(`| ${d.label} | ${d.startYear}~${d.endYear} | ${d.avg} |`);
+    }
+    L.push("");
+    const sorted = [...lk.years].sort((a, b) => b.score - a.score);
+    const fmtYear = (y: (typeof lk.years)[number]) =>
+      `${y.year} ${y.ganZhi}（${y.age}岁，${y.score}分：${y.factors.slice(0, 3).join("；") || "平年"}）`;
+    L.push(`- 高光年份 TOP5：`);
+    for (const y of sorted.slice(0, 5)) L.push(`  - ${fmtYear(y)}`);
+    L.push(`- 低谷年份 TOP5：`);
+    for (const y of sorted.slice(-5).reverse()) L.push(`  - ${fmtYear(y)}`);
+    const cur = lk.years.find((y) => y.year === z.pick.year);
+    if (cur) {
+      L.push(`- 当前观测年 ${cur.year} ${cur.ganZhi}：${cur.score} 分（较上年 ${cur.delta >= 0 ? "+" : ""}${cur.delta}）`);
+      for (const f of cur.factors) L.push(`  - ${f}`);
+    }
+    L.push("");
+  }
+
+  L.push(`## 七、使用说明`);
   L.push("");
   L.push(
     `将本文件整体提供给 AI，并附上您的问题（如性格、事业、婚姻、某年吉凶等）。分析时请 AI 严格依照本文件数据与 meta 中标注的流派口径推理，不要自行改星改宫。${

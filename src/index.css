@@ -962,6 +962,114 @@ body {
 .hcell.on-hourly { border-color: var(--c-hourly); background: rgba(255, 119, 183, 0.15); box-shadow: 0 0 14px rgba(255, 119, 183, 0.4); }
 .hcell.on-hourly i, .hcell.on-hourly b { color: #ffe9f3; }
 
+/* ── 人生K线 ── */
+.kline {
+  margin-top: 14px;
+  padding: 10px 12px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(7, 11, 24, 0.72);
+  box-shadow: 0 0 24px rgba(85, 215, 255, 0.07), inset 0 0 18px rgba(10, 18, 40, 0.55);
+}
+
+.kline-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.kline-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(243, 201, 107, 0.4);
+}
+
+.kline-legend {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.kline-legend i {
+  font-style: normal;
+  margin-right: 8px;
+}
+
+.kline-scroll {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.kline-canvas {
+  position: relative;
+}
+
+.kline-svg {
+  display: block;
+  user-select: none;
+}
+
+.kline-tip {
+  position: absolute;
+  top: 4px;
+  z-index: 10;
+  width: 235px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(85, 215, 255, 0.35);
+  background: rgba(7, 11, 24, 0.96);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 14px rgba(85, 215, 255, 0.15);
+  pointer-events: none;
+}
+
+.kline-tip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.kline-tip-head b {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.kline-tip-head em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--dim);
+  margin-left: 5px;
+}
+
+.kline-tip-head span {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kline-tip p {
+  margin: 2px 0 0;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+.kline-tip-more {
+  opacity: 0.6;
+}
+
+.kline-note {
+  margin: 6px 0 0;
+  font-size: 10px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
 /* ── 出错 / 页脚 ── */
 .err-box {
   margin: 30px auto;
