@@ -66,8 +66,21 @@ export type KlineYear = {
   close: number;
   high: number;
   low: number;
+  /** 净运势（= close） */
   score: number;
   delta: number;
+  /** 进：禄权科·六合（吉动能，撑起上影） */
+  gain: number;
+  /** 出：忌·冲·并临·自化漏（凶动能，压下下影） */
+  drain: number;
+  /** 净 = gain − drain（决定 close 涨跌） */
+  net: number;
+  /** 总动能 = gain + drain（该域该年有多“大”） */
+  magnitude: number;
+  /** 年度形态：顺遂 / 大进大出 / 破耗 / 平稳 / 平 */
+  pattern: string;
+  /** 出项性质：主动·自化漏 / 被动·忌冲 / 纠缠·忌入 …（无显著出项则空） */
+  drainNature: string;
   factors: string[];
 };
 
@@ -185,7 +198,7 @@ export function buildLifeKline(
     const wmap = tsWeights(P);
     const composeNames = [...wmap.keys()].map((q) => a.palaces[q].name);
 
-    /* baseline */
+    /* baseline（静态：三方四正星情 + 生年四化 + 身宫；自化忌者留不住，基调略降） */
     let baseline = 0;
     for (const [q, w] of wmap) baseline += w * palaceStarScore(a, q).s;
     for (const hit of mutHits(natalYearStem)) {
@@ -193,6 +206,9 @@ export function buildLifeKline(
       if (w) baseline += w * MUT_NATAL_BASE[hit.k];
     }
     if (palace.isBodyPalace) baseline += 2;
+    // 自化忌（本宫宫干化忌落本宫）：主动漏、得而复失的结构性倾向
+    const hasSelfJi = mutHits(palace.heavenlyStem).some((h) => h.k === 3 && h.idx === P);
+    if (hasSelfJi) baseline -= 2;
     baseline = clamp(round(baseline), -18, 18);
 
     const years: KlineYear[] = [];
@@ -201,59 +217,97 @@ export function buildLifeKline(
       const gz = yearGanZhi(year);
       const yStem = gz.charAt(0);
       const yBranch = gz.charAt(1);
+      const pBranch = palace.earthlyBranch as string;
       const decade = decadeAt(age);
       const factors: string[] = [];
-      let score = 50 + baseline;
+      let gain = 0; // 进：禄权科·六合
+      let drain = 0; // 出：忌·冲·并临·自化漏
+      const nature: string[] = []; // 出项性质（主动/被动/纠缠）
 
-      if (decade) {
-        for (const hit of mutHits(decade.heavenlyStem)) {
+      // 四化落三方四正：禄权科=进；忌=出，按落位区分性质（入本宫=纠缠 / 冲本宫=被动 / 三合=拖累）
+      const applyMut = (stem: string, MUT: number[], tag: string) => {
+        for (const hit of mutHits(stem)) {
           const w = wmap.get(hit.idx);
           if (!w) continue;
-          const v = w * MUT_DECADAL[hit.k];
-          score += v;
+          const v = w * MUT[hit.k];
+          if (hit.k === 3) {
+            drain += Math.abs(v);
+            if (hit.idx === P) nature.push(`${tag}${hit.star}忌入本宫·纠缠`);
+            else if (hit.idx === fixIndex(P + 6)) nature.push(`${tag}${hit.star}忌冲本宫·被动`);
+            else nature.push(`${tag}${hit.star}忌拖累三合`);
+          } else {
+            gain += v;
+          }
           if (Math.abs(v) >= 1)
-            factors.push(`大限${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
+            factors.push(`${tag}${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
         }
-      }
-      for (const hit of mutHits(yStem)) {
-        const w = wmap.get(hit.idx);
-        if (!w) continue;
-        const v = w * MUT_YEARLY[hit.k];
-        score += v;
-        if (Math.abs(v) >= 1)
-          factors.push(`流年${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
-      }
+      };
+      if (decade) applyMut(decade.heavenlyStem, MUT_DECADAL, "大限");
+      applyMut(yStem, MUT_YEARLY, "流年");
 
-      const pBranch = palace.earthlyBranch as string;
+      // 流年支与本宫：六合=进，六冲=出（被动）
       if (CHONG[yBranch] === pBranch) {
-        score -= 4;
+        drain += 4;
+        nature.push("流年支冲本宫·被动");
         factors.push("流年支冲本宫 -4");
       } else if (LIU_HE[yBranch] === pBranch) {
-        score += 2;
+        gain += 2;
         factors.push("流年支合本宫 +2");
       }
 
-      if (
-        meta.priority === 0 &&
-        decade &&
-        gz === `${decade.heavenlyStem}${decade.earthlyBranch}`
-      ) {
-        score -= 2;
+      // 岁限并临（命宫域）：动荡
+      if (meta.priority === 0 && decade && gz === `${decade.heavenlyStem}${decade.earthlyBranch}`) {
+        drain += 2;
+        nature.push("岁限并临·动荡");
         factors.push("岁限并临 -2");
       }
 
-      score = clamp(round(score), 8, 92);
-      years.push({ year, age, ganZhi: gz, open: 0, close: score, high: 0, low: 0, score, delta: 0, factors });
+      // 自化忌：进得越大、主动漏得越多（得而复失）
+      if (hasSelfJi && gain > 0) {
+        const leak = gain * 0.4;
+        drain += leak;
+        nature.push("主动·自化漏（得而复失）");
+        factors.push(`自化忌漏财（进越大漏越多） -${round(leak)}`);
+      }
+
+      const net = gain - drain;
+      const magnitude = gain + drain;
+      const close = clamp(round(50 + baseline + net), 8, 92);
+
+      let pattern = "平稳";
+      if (magnitude < 4) pattern = "平";
+      else if (gain >= 5 && drain >= 5) pattern = "大进大出";
+      else if (net >= 5) pattern = "顺遂";
+      else if (net <= -5) pattern = "破耗";
+
+      years.push({
+        year,
+        age,
+        ganZhi: gz,
+        open: 0,
+        close,
+        high: 0,
+        low: 0,
+        score: close,
+        delta: 0,
+        gain: round(gain),
+        drain: round(drain),
+        net: round(net),
+        magnitude: round(magnitude),
+        pattern,
+        drainNature: drain >= 3 ? [...new Set(nature)].slice(0, 3).join("、") : "",
+        factors,
+      });
     }
 
-    /* OHLC 串联 */
+    /* OHLC：body=净(open→close)，上影∝进(gain)，下影∝出(drain)；
+       大进大出 → 小实体+长上下影（十字），顺遂 → 长阳短影，破耗 → 阴线长下影 */
     let prevClose = 50 + baseline;
     for (const y of years) {
       y.open = round(prevClose);
       y.delta = y.close - y.open;
-      const vol = clamp(3 + y.factors.filter((f) => /冲|忌|煞|并临/.test(f)).length * 2, 3, 14);
-      y.high = clamp(Math.max(y.open, y.close) + vol * 0.6, 2, 98);
-      y.low = clamp(Math.min(y.open, y.close) - vol * 0.6, 2, 98);
+      y.high = clamp(round(Math.max(y.open, y.close) + y.gain * 0.5), 2, 98);
+      y.low = clamp(round(Math.min(y.open, y.close) - y.drain * 0.5), 2, 98);
       prevClose = y.close;
     }
 
@@ -288,7 +342,7 @@ export function buildLifeKline(
   );
 
   return {
-    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫（大限/流年/生年）,大限基调随限共享。命-财帛-官禄同三合会同步,夫妻/疾厄等分化。确定性推演,仅供参考娱乐。",
+    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科)」与「出(忌·冲·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。确定性推演,仅供参考娱乐。",
     domains,
     bands,
     lastAge,

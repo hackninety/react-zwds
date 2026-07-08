@@ -83,7 +83,8 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
           <i style={{ color: UP }}>红涨</i>
           <i style={{ color: DOWN }}>绿跌</i>
           <i style={{ color: GOLD }}>金线=5年均线</i>
-          <i style={{ color: CYAN }}>点年份联动拨盘</i> · 悬停看明细
+          <i>上影=进/下影=出，长上下影=大进大出</i>
+          <i style={{ color: CYAN }}>点年份联动拨盘</i>
         </span>
       </div>
 
@@ -235,6 +236,18 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
                   {Math.abs(h.delta)}
                 </span>
               </div>
+              <div className="kline-tip-metrics">
+                <span className={`kline-pat kline-pat-${h.pattern}`}>{h.pattern}</span>
+                <span>
+                  进<b style={{ color: UP }}>{h.gain}</b> · 出
+                  <b style={{ color: DOWN }}>{h.drain}</b> · 净
+                  <b style={{ color: h.net >= 0 ? UP : DOWN }}>
+                    {h.net >= 0 ? "+" : ""}
+                    {h.net}
+                  </b>
+                </span>
+              </div>
+              {h.drainNature && <p className="kline-tip-nature">出项：{h.drainNature}</p>}
               {(h.factors.length ? h.factors.slice(0, 6) : ["平年（三方四正无显著引动）"]).map((f, fi) => (
                 <p key={fi}>· {f}</p>
               ))}

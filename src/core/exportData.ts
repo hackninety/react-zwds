@@ -192,11 +192,19 @@ function serializeLifeKline(z: Zwds) {
   if (!lk?.domains.length) return null;
   const domains = lk.domains.map((d) => {
     const sorted = [...d.years].sort((a, b) => b.score - a.score);
+    // 动能最大（无论好坏）——用于点出「大进大出」类年份
+    const turbulent = [...d.years].sort((a, b) => b.magnitude - a.magnitude);
     const pick = (y: (typeof d.years)[number]) => ({
       year: y.year,
       ganZhi: y.ganZhi,
       age: y.age,
       score: y.score,
+      net: y.net,
+      gain: y.gain,
+      drain: y.drain,
+      magnitude: y.magnitude,
+      pattern: y.pattern,
+      drainNature: y.drainNature || undefined,
       factors: y.factors,
     });
     const cur = d.years.find((y) => y.year === z.pick.year);
@@ -208,13 +216,27 @@ function serializeLifeKline(z: Zwds) {
       baseline: d.baseline,
       sanfangsizheng: d.compose,
       decadeAvg: d.decadeAvg,
-      series: d.years.map((y) => ({ year: y.year, age: y.age, score: y.score, delta: y.delta })),
+      // 逐年：score=净运势, net=进-出, gain=进, drain=出, pattern=形态
+      series: d.years.map((y) => ({
+        year: y.year,
+        age: y.age,
+        score: y.score,
+        delta: y.delta,
+        gain: y.gain,
+        drain: y.drain,
+        pattern: y.pattern,
+      })),
       highlights: sorted.slice(0, 3).map(pick),
       lowlights: sorted.slice(-3).reverse().map(pick),
+      mostTurbulent: turbulent.slice(0, 3).map(pick),
       currentYear: cur ? pick(cur) : null,
     };
   });
-  return { note: lk.note, domains };
+  return {
+    note: lk.note,
+    legend: "score/净=净运势(涨跌)；gain/进=禄权科动能；drain/出=忌冲自化漏动能；pattern=顺遂/大进大出/破耗/平稳/平；drainNature=出项性质(主动自化漏/被动忌冲/纠缠忌入)。判断某年好坏须同时看 净 与 进出：大进大出=净或有限但动能大、得失起伏，非单纯好或坏。",
+    domains,
+  };
 }
 
 /* ─────────────── Markdown ─────────────── */
@@ -423,12 +445,16 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
     L.push(`### 各域概览（十二宫）`);
     L.push("");
-    L.push(`| 域（宫·支） | 三方四正 | 基调 | 高光年（分） | 低谷年（分） | 当前${z.pick.year}年 |`);
-    L.push(`|---|---|---|---|---|---|`);
+    L.push(
+      `| 域（宫·支） | 三方四正 | 基调 | 高光年(净) | 低谷年(净) | 动能最大年(形态) | 当前${z.pick.year}年 |`
+    );
+    L.push(`|---|---|---|---|---|---|---|`);
     for (const d of lk.domains) {
       const sorted = [...d.years].sort((a, b) => b.score - a.score);
+      const turbulent = [...d.years].sort((a, b) => b.magnitude - a.magnitude);
       const top = sorted[0];
       const bot = sorted[sorted.length - 1];
+      const tur = turbulent[0];
       const cur = d.years.find((y) => y.year === z.pick.year);
       const bodyMark = d.isBody ? "·身" : "";
       L.push(
@@ -436,18 +462,24 @@ export function buildExportMd(z: Zwds): string | null {
           d.baseline >= 0 ? "+" : ""
         }${d.baseline} | ${top ? `${top.year}(${top.score})` : "-"} | ${
           bot ? `${bot.year}(${bot.score})` : "-"
-        } | ${cur ? `${cur.score}` : "-"} |`
+        } | ${tur ? `${tur.year}(${tur.pattern})` : "-"} | ${
+          cur ? `${cur.score}·${cur.pattern}` : "-"
+        } |`
       );
     }
     L.push("");
-    L.push(`> 说明：命-财帛-官禄同属一三合三角,三条线会同步（命财官不分家）；夫妻/迁移/福德、兄弟/疾厄/田宅、子女/交友/父母各自成组,与综合分化。身宫所在宫已在基调 +2 并标「身」。`);
+    L.push(
+      `> 读法：**净=运势涨跌，进(禄权科)/出(忌冲自化漏)是两股动能**。故「大进大出」年（进出都大、净有限）不是简单的好或坏——如财帛该年赚得多也花/破得多，须看出项性质：主动(自化漏，多为自己花用/投资)、被动(忌冲，多为官非·罚款·外来破财)、纠缠(忌入，是非缠身)。命-财帛-官禄同一三合三角会同步；夫妻/迁移/福德、兄弟/疾厄/田宅、子女/交友/父母各自成组分化。身宫所在宫基调 +2 标「身」。`
+    );
     L.push("");
     const overall = lk.domains.find((d) => d.palaceName === "命宫") ?? lk.domains[0];
     const cur = overall.years.find((y) => y.year === z.pick.year);
     if (cur) {
       L.push(`### 综合（命宫）当前 ${cur.year} ${cur.ganZhi} 明细`);
       L.push("");
-      L.push(`- ${cur.score} 分（较上年 ${cur.delta >= 0 ? "+" : ""}${cur.delta}）`);
+      L.push(
+        `- ${cur.score} 分（较上年 ${cur.delta >= 0 ? "+" : ""}${cur.delta}）· 形态：**${cur.pattern}** · 进 ${cur.gain} / 出 ${cur.drain} / 净 ${cur.net >= 0 ? "+" : ""}${cur.net}${cur.drainNature ? ` · 出项：${cur.drainNature}` : ""}`
+      );
       for (const f of cur.factors.length ? cur.factors : ["平年（三方四正无显著引动）"]) L.push(`  - ${f}`);
       L.push("");
     }
