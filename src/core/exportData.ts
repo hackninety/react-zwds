@@ -6,6 +6,7 @@ import { util } from "iztro";
 import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
 import { MUTAGEN_CHARS, SCOPE_META, fixIndex, type Scope } from "./utils";
 import { lunarToSolarStr } from "./lunar";
+import { analyzeChart, type ChartAnalysis } from "./analysis";
 
 /** 本宫自化（离心）：宫干四化命中本宫主星/辅星 */
 function getSelfMutagens(p: Astrolabe["palaces"][number]) {
@@ -110,7 +111,7 @@ export function buildExportData(z: Zwds) {
           ? "地盘（身宫起局重排）"
           : "人盘（福德宫起局重排）",
     exportedAt: new Date().toISOString(),
-    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。",
+    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。",
   };
 
   const input = {
@@ -183,7 +184,15 @@ export function buildExportData(z: Zwds) {
       }
     : null;
 
-  return { meta, input, basic, palaces, horoscope, lifeKline: serializeLifeKline(z) };
+  return {
+    meta,
+    input,
+    basic,
+    palaces,
+    analysis: analyzeChart(a),
+    horoscope,
+    lifeKline: serializeLifeKline(z),
+  };
 }
 
 /** 人生K线导出：紧凑逐年序列 + 各域高光/低谷（带计分原因） */
@@ -289,10 +298,110 @@ function scopeSection(
   return lines.join("\n");
 }
 
+/** 二、格局与关键结构 */
+function analysisPatternsMd(an: ChartAnalysis): string[] {
+  const L: string[] = [];
+  L.push(`## 二、格局与关键结构（程序确定性检测）`);
+  L.push("");
+  L.push(`> 以下按本盘星位逐一判定（含成格瑕疵与古籍出处），推理请直接引用本节结论，不要自行重推格局。`);
+  L.push("");
+  if (an.patterns.length) {
+    L.push(`### 格局（共 ${an.patterns.length} 个）`);
+    L.push("");
+    an.patterns.forEach((p, i) => {
+      L.push(`${i + 1}. **${p.name}**〔${p.kind}〕· ${p.where}`);
+      L.push(`   - 构成：${p.basis}`);
+      L.push(`   - 释义：${p.meaning}`);
+      if (p.classic) L.push(`   - 古籍：${p.classic}`);
+      if (p.flaw) L.push(`   - ⚠ 瑕疵：${p.flaw}`);
+    });
+  } else {
+    L.push(`### 格局：未检出经典格局（以星情与四化论）`);
+  }
+  L.push("");
+  L.push(`### 夹宫关系`);
+  L.push("");
+  if (an.jiaGong.length) {
+    for (const j of an.jiaGong) {
+      L.push(`- ${j.palaceName}(${j.branch}) 被**${j.kind}**〔${j.good ? "吉" : "凶"}〕——${j.detail}`);
+    }
+  } else {
+    L.push(`- 未检出显著夹宫组合`);
+  }
+  L.push("");
+  if (an.borrowed.length) {
+    L.push(`### 空宫借星（借对宫主星论）`);
+    L.push("");
+    for (const b of an.borrowed) {
+      L.push(`- ${b.palaceName}(${b.branch}) 无主星，借对宫【${b.oppositeName}】：${b.borrowed.join("、") || "对宫亦无主星（再借其三方论）"}`);
+    }
+    L.push("");
+  }
+  return L;
+}
+
+/** 四、三方四正快照 */
+function sanfangMd(an: ChartAnalysis): string[] {
+  const L: string[] = [];
+  L.push(`## 四、三方四正快照（每宫会照总览）`);
+  L.push("");
+  L.push(`> 每宫的对宫/三合已算好并汇总会吉、会煞、生年四化会入——判断任一宫强弱直接读本表，无需再数宫位。`);
+  L.push("");
+  L.push(`| 宫位 | 本宫主星 | 对宫 | 三合 | 三合 | 会吉（六吉禄马） | 会煞 | 生年四化会入 |`);
+  L.push(`|---|---|---|---|---|---|---|---|`);
+  for (const s of an.sanfang) {
+    const [self, opp, t1, t2] = s.seats;
+    const cell = (x: (typeof s.seats)[number]) => `${x.palaceName}(${x.branch})：${x.majors}`;
+    L.push(
+      `| **${s.palaceName}(${s.branch})** | ${self.majors} | ${cell(opp)} | ${cell(t1)} | ${cell(t2)} | ${
+        s.auspicious.join("、") || "无"
+      } | ${s.inauspicious.join("、") || "无"} | ${s.natalMutagens.join("、") || "无"} |`
+    );
+  }
+  L.push("");
+  const borrowedNotes = an.sanfang.filter((s) => s.borrowed);
+  for (const s of borrowedNotes) L.push(`> ${s.palaceName}(${s.branch})：${s.borrowed}`);
+  if (borrowedNotes.length) L.push("");
+  return L;
+}
+
+/** 五、飞宫四化全矩阵 */
+function flyMatrixMd(an: ChartAnalysis): string[] {
+  const L: string[] = [];
+  const fm = an.flyMatrix;
+  L.push(`## 五、飞宫四化全矩阵（十二宫互飞）`);
+  L.push("");
+  L.push(`> ${fm.note}`);
+  L.push("");
+  L.push(`| 宫（干支） | 化禄 | 化权 | 化科 | 化忌 |`);
+  L.push(`|---|---|---|---|---|`);
+  for (const pf of fm.palaces) {
+    const cell = (k: number) => {
+      const f = pf.flies[k];
+      if (!f) return "-";
+      if (f.isSelf) return `${f.star}→**本宫**（自化${f.mutagen}·离心）`;
+      return `${f.star}→${f.toName}${f.isOpposite ? "（冲本宫方向）" : ""}`;
+    };
+    L.push(`| **${pf.palaceName}**（${pf.stem}${pf.branch}） | ${cell(0)} | ${cell(1)} | ${cell(2)} | ${cell(3)} |`);
+  }
+  L.push("");
+  const outward = fm.palaces.filter((p) => p.selfOutward.length);
+  const inward = fm.palaces.filter((p) => p.selfInward.length);
+  if (outward.length) {
+    L.push(`- **离心自化汇总**：${outward.map((p) => `${p.palaceName}(${p.selfOutward.join("、")})`).join("；")}`);
+  }
+  if (inward.length) {
+    L.push(`- **向心自化汇总**：${inward.map((p) => `${p.palaceName}(${p.selfInward.join("、")})`).join("；")}`);
+  }
+  L.push("");
+  return L;
+}
+
 export function buildExportMd(z: Zwds): string | null {
   const a = z.astrolabe;
   if (!a) return null;
   const h = z.horoscope;
+  const an = analyzeChart(a);
   const L: string[] = [];
 
   L.push(`# 紫微斗数命盘（AI 分析用）`);
@@ -333,8 +442,11 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(`| 常居住地 | ${z.input.residence}（不参与排盘，供地域/方位/迁移背景参考） |`);
   L.push("");
 
-  /* 二、十二宫详情（命宫起，逆布） */
-  L.push(`## 二、十二宫详情`);
+  /* 二、格局与关键结构 */
+  L.push(...analysisPatternsMd(an));
+
+  /* 三、十二宫详情（命宫起，逆布） */
+  L.push(`## 三、十二宫详情`);
   L.push("");
   const soul = z.soulPalaceIndex >= 0 ? z.soulPalaceIndex : 0;
   for (let k = 0; k < 12; k++) {
@@ -344,6 +456,12 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(`### ${k + 1}. ${p.name}${marks}（${p.heavenlyStem}${p.earthlyBranch}）`);
     L.push("");
     L.push(`- 主星：${starList(p.majorStars)}`);
+    if (!p.majorStars.length) {
+      const opp = a.palaces[fixIndex(p.index + 6)];
+      L.push(
+        `- 借星：无主星，借对宫【${opp.name}】${starList(opp.majorStars)}（借星力量略减，兼看其四化）`
+      );
+    }
     L.push(`- 辅星：${starList(p.minorStars)}`);
     L.push(`- 杂耀：${starList(p.adjectiveStars)}`);
     const selfMuts = getSelfMutagens(p);
@@ -360,9 +478,13 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
   }
 
-  /* 三、当前观测运限 */
+  /* 四、三方四正快照 + 五、飞宫四化 */
+  L.push(...sanfangMd(an));
+  L.push(...flyMatrixMd(an));
+
+  /* 六、当前观测运限 */
   if (h) {
-    L.push(`## 三、当前观测运限`);
+    L.push(`## 六、当前观测运限`);
     L.push("");
     L.push(
       `- 观测点：公历 ${h.solarDate}（农历 ${h.lunarDate}），虚岁 ${h.age.nominalAge}`
@@ -401,10 +523,10 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(scopeSection(a, "hourly", h.hourly, `（${z.hours[z.pick.hour]?.label ?? ""}）`));
   }
 
-  /* 四、十二大限总览 */
+  /* 七、十二大限总览 */
   const all = getAllDecadals(z);
   if (all.length) {
-    L.push(`## 四、十二大限总览`);
+    L.push(`## 七、十二大限总览`);
     L.push("");
     L.push(`| 年龄段（虚岁） | 大限干支 | 大限命宫落宫 | 四化（禄/权/科/忌） |`);
     L.push(`|---|---|---|---|`);
@@ -419,10 +541,10 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
   }
 
-  /* 五、当年十二流月总览 */
+  /* 八、当年十二流月总览 */
   const my = getMonthlyOfYear(z);
   if (my.length) {
-    L.push(`## 五、${z.pick.year} 年十二流月总览`);
+    L.push(`## 八、${z.pick.year} 年十二流月总览`);
     L.push("");
     L.push(`| 流月 | 干支 | 流月命宫落宫 | 四化（禄/权/科/忌） |`);
     L.push(`|---|---|---|---|`);
@@ -436,10 +558,10 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
   }
 
-  /* 六、人生K线（分域量化参考） */
+  /* 九、人生K线（分域量化参考） */
   const lk = z.lifeKline;
   if (lk?.domains.length) {
-    L.push(`## 六、人生K线（分域量化参考）`);
+    L.push(`## 九、人生K线（分域量化参考）`);
     L.push("");
     L.push(`> ${lk.note}`);
     L.push("");
@@ -485,15 +607,34 @@ export function buildExportMd(z: Zwds): string | null {
     }
   }
 
-  L.push(`## 七、使用说明`);
+  L.push(`## 十、AI 推理指引`);
   L.push("");
+  L.push(`将本文件整体提供给 AI 并附上您的问题。建议同时粘贴以下指令（可直接复制）：`);
+  L.push("");
+  L.push(`> 请以严谨的紫微斗数分析师身份，严格依据本文件数据推理：`);
   L.push(
-    `将本文件整体提供给 AI，并附上您的问题（如性格、事业、婚姻、某年吉凶等）。分析时请 AI 严格依照本文件数据与 meta 中标注的流派口径推理，不要自行改星改宫。${
-      z.input.residence
-        ? `命主常居住地为「${z.input.residence}」，涉及迁移（迁移宫）、方位喜忌、异地发展等议题时可结合参考。`
-        : ""
-    }`
+    `> 1. 先复述盘面骨架——命宫主星与亮度、第二节已检出的格局、生年四化落宫——确认无误后再展开分析；`
   );
+  L.push(
+    `> 2. 三方四正、格局、飞宫四化、夹宫、借星均已在第二/四/五节确定性算好，请直接引用，不要自行重算宫位关系；若需推衍文中未列的关系，按宫位环形计算（对宫=隔六位，三合=前后各隔四位）；`
+  );
+  L.push(`> 3. 推理次序：本命（性格/禀赋/格局）→ 大限定十年基调 → 流年四化引动断当年吉凶 → 流月定应期；`);
+  L.push(
+    `> 4. 每个论断须注明依据（引用具体宫位/星耀/四化/格局），并区分「结构必然 / 大概率 / 倾向参考」三档确定度；`
+  );
+  L.push(`> 5. 流派口径以本文件 meta 标注为准，不得改星、改宫、改四化。`);
+  if (z.input.residence) {
+    L.push(
+      `> 6. 命主常居住地为「${z.input.residence}」（不参与排盘），涉及迁移宫、方位喜忌、异地发展等议题时结合参考。`
+    );
+  }
+  L.push("");
+  L.push(`常见问题示例（附建议取用素材）：`);
+  L.push("");
+  L.push(`- 我的性格优劣势与适合的行业方向？——命宫/官禄/福德三方四正快照 + 第二节格局`);
+  L.push(`- 某年运势如何，宜进取还是防守？——该年流年四化（第六/八节）+ 人生K线该年进/出/净与形态（第九节）`);
+  L.push(`- 感情婚姻的走势与要点？——夫妻宫三方四正快照 + 夫妻宫飞宫四化 + 大限夫妻宫叠宫`);
+  L.push(`- 近十年何时适合创业/置业/转型？——十二大限总览（第七节）+ K线高光年 + 官禄/田宅域曲线`);
   L.push("");
 
   return L.join("\n");

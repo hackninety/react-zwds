@@ -1,0 +1,837 @@
+/**
+ * 结构分析层：把斗数推理中「机械且 AI 最易出错」的中间步骤确定性算好，
+ * 供导出直接引用 —— 三方四正快照、飞宫四化全矩阵（含离心/向心自化）、
+ * 夹宫关系、空宫借星、经典格局检测（成格/破格判定 + 古籍出处）。
+ *
+ * 全部只读本命盘（Astrolabe），不依赖运限状态；四化表跟随 iztro 全局配置。
+ */
+import { util } from "iztro";
+import type { Astrolabe } from "./useZwds";
+import { MUTAGEN_CHARS, fixIndex } from "./utils";
+
+/* ─────────────── 基础索引 ─────────────── */
+
+const AUSPICIOUS_MINORS = ["左辅", "右弼", "天魁", "天钺", "文昌", "文曲", "禄存", "天马"];
+const SHA_STARS = ["擎羊", "陀罗", "火星", "铃星", "地空", "地劫"];
+
+type ChartIndex = {
+  a: Astrolabe;
+  soulIdx: number;
+  /** 星名 → 宫索引（主星+辅星+杂耀） */
+  pos: Map<string, number>;
+  /** 星名 → 亮度（有则填） */
+  bright: Map<string, string>;
+  /** 生年四化星 [禄,权,科,忌] */
+  natal: string[];
+  yearStem: string;
+};
+
+function starNamesAt(a: Astrolabe, i: number): string[] {
+  const p = a.palaces[fixIndex(i)];
+  return [...p.majorStars, ...p.minorStars, ...p.adjectiveStars].map((s) => s.name as string);
+}
+
+export function buildChartIndex(a: Astrolabe): ChartIndex {
+  const pos = new Map<string, number>();
+  const bright = new Map<string, string>();
+  for (const p of a.palaces) {
+    for (const s of [...p.majorStars, ...p.minorStars, ...p.adjectiveStars]) {
+      pos.set(s.name as string, p.index);
+      if (s.brightness) bright.set(s.name as string, s.brightness as string);
+    }
+  }
+  const yearStem = a.chineseDate.split(" ")[0]?.charAt(0) ?? "";
+  const natal = yearStem ? (util.getMutagensByHeavenlyStem(yearStem as never) as string[]) : [];
+  return {
+    a,
+    soulIdx: a.palaces.findIndex((p) => p.name === "命宫"),
+    pos,
+    bright,
+    natal,
+    yearStem,
+  };
+}
+
+/** P 的三方四正索引：[本宫, 对宫, 三合, 三合] */
+const sanfangIdx = (P: number) => [fixIndex(P), fixIndex(P + 6), fixIndex(P + 4), fixIndex(P - 4)];
+const SEAT_ROLES = ["本宫", "对宫", "三合", "三合"] as const;
+
+const starTxt = (ix: ChartIndex, name: string) => {
+  const b = ix.bright.get(name);
+  const k = ix.natal.indexOf(name);
+  return `${name}${b ? `(${b})` : ""}${k >= 0 ? `【生年${MUTAGEN_CHARS[k]}】` : ""}`;
+};
+
+/* ─────────────── 一、空宫借星 ─────────────── */
+
+export type BorrowedInfo = {
+  palaceIndex: number;
+  palaceName: string;
+  branch: string;
+  /** 借对宫主星（带亮度） */
+  borrowed: string[];
+  oppositeName: string;
+};
+
+export function getBorrowedStars(a: Astrolabe): BorrowedInfo[] {
+  const ix = buildChartIndex(a);
+  const out: BorrowedInfo[] = [];
+  for (const p of a.palaces) {
+    if (p.majorStars.length) continue;
+    const opp = a.palaces[fixIndex(p.index + 6)];
+    out.push({
+      palaceIndex: p.index,
+      palaceName: p.name,
+      branch: p.earthlyBranch as string,
+      borrowed: opp.majorStars.map((s) => starTxt(ix, s.name as string)),
+      oppositeName: opp.name,
+    });
+  }
+  return out;
+}
+
+/* ─────────────── 二、三方四正快照 ─────────────── */
+
+export type SanfangSeat = {
+  role: (typeof SEAT_ROLES)[number];
+  palaceName: string;
+  branch: string;
+  majors: string;
+};
+
+export type SanfangSnapshot = {
+  palaceIndex: number;
+  palaceName: string;
+  branch: string;
+  seats: SanfangSeat[];
+  /** 会照六吉+禄马（带落点） */
+  auspicious: string[];
+  /** 会照六煞（带落点） */
+  inauspicious: string[];
+  /** 生年四化会入（带落点） */
+  natalMutagens: string[];
+  shaCount: number;
+  borrowed: string | null;
+};
+
+export function getSanfangSnapshots(a: Astrolabe): SanfangSnapshot[] {
+  const ix = buildChartIndex(a);
+  return a.palaces.map((p) => {
+    const idxs = sanfangIdx(p.index);
+    const seats: SanfangSeat[] = idxs.map((q, k) => {
+      const t = a.palaces[q];
+      return {
+        role: SEAT_ROLES[k],
+        palaceName: t.name,
+        branch: t.earthlyBranch as string,
+        majors: t.majorStars.map((s) => starTxt(ix, s.name as string)).join("、") || "无主星",
+      };
+    });
+    const locTag = (q: number, k: number) =>
+      k === 0 ? "本宫" : k === 1 ? `对宫·${a.palaces[q].name}` : `三合·${a.palaces[q].name}`;
+    const auspicious: string[] = [];
+    const inauspicious: string[] = [];
+    const natalMutagens: string[] = [];
+    let shaCount = 0;
+    idxs.forEach((q, k) => {
+      const names = starNamesAt(a, q);
+      for (const n of names) {
+        if (AUSPICIOUS_MINORS.includes(n)) auspicious.push(`${n}(${locTag(q, k)})`);
+        if (SHA_STARS.includes(n)) {
+          inauspicious.push(`${n}(${locTag(q, k)})`);
+          shaCount++;
+        }
+        const mk = ix.natal.indexOf(n);
+        if (mk >= 0) natalMutagens.push(`${n}化${MUTAGEN_CHARS[mk]}(${locTag(q, k)})`);
+      }
+    });
+    const opp = a.palaces[fixIndex(p.index + 6)];
+    const borrowed =
+      p.majorStars.length === 0
+        ? `本宫无主星，借对宫【${opp.name}】${
+            opp.majorStars.map((s) => starTxt(ix, s.name as string)).join("、") || "（对宫亦无主星）"
+          }`
+        : null;
+    return {
+      palaceIndex: p.index,
+      palaceName: p.name,
+      branch: p.earthlyBranch as string,
+      seats,
+      auspicious,
+      inauspicious,
+      natalMutagens,
+      shaCount,
+      borrowed,
+    };
+  });
+}
+
+/* ─────────────── 三、飞宫四化全矩阵 ─────────────── */
+
+export type FlyEntry = {
+  mutagen: (typeof MUTAGEN_CHARS)[number];
+  star: string;
+  toIndex: number;
+  toName: string;
+  toBranch: string;
+  /** 落回本宫（离心自化） */
+  isSelf: boolean;
+  /** 落入对宫（即对宫的向心来源） */
+  isOpposite: boolean;
+};
+
+export type PalaceFly = {
+  palaceIndex: number;
+  palaceName: string;
+  branch: string;
+  stem: string;
+  flies: FlyEntry[];
+  /** 离心自化：本宫干四化本宫之星 */
+  selfOutward: string[];
+  /** 向心自化：对宫干四化入本宫之星 */
+  selfInward: string[];
+};
+
+export type FlyMatrix = {
+  palaces: PalaceFly[];
+  /** 语句化：每宫一句「X宫(干)：禄入A、权入B、科入C、忌入D」 */
+  sentences: string[];
+  note: string;
+};
+
+export function getFlyMatrix(a: Astrolabe): FlyMatrix {
+  const ix = buildChartIndex(a);
+  const rawFlies = (P: number): FlyEntry[] => {
+    const p = a.palaces[P];
+    const stars = util.getMutagensByHeavenlyStem(p.heavenlyStem as never) as string[];
+    return stars.map((star, k) => {
+      const to = ix.pos.get(star) ?? -1;
+      const t = to >= 0 ? a.palaces[to] : null;
+      return {
+        mutagen: MUTAGEN_CHARS[k],
+        star,
+        toIndex: to,
+        toName: t?.name ?? "（星不在盘中）",
+        toBranch: (t?.earthlyBranch as string) ?? "",
+        isSelf: to === P,
+        isOpposite: to === fixIndex(P + 6),
+      };
+    });
+  };
+  const palaces: PalaceFly[] = a.palaces.map((p) => {
+    const flies = rawFlies(p.index);
+    const oppFlies = rawFlies(fixIndex(p.index + 6));
+    return {
+      palaceIndex: p.index,
+      palaceName: p.name,
+      branch: p.earthlyBranch as string,
+      stem: p.heavenlyStem as string,
+      flies,
+      selfOutward: flies.filter((f) => f.isSelf).map((f) => `${f.star}化${f.mutagen}`),
+      selfInward: oppFlies
+        .filter((f) => f.toIndex === p.index)
+        .map((f) => `${f.star}化${f.mutagen}（来自对宫宫干）`),
+    };
+  });
+  const sentences = palaces.map((pf) => {
+    const parts = pf.flies.map((f) =>
+      f.isSelf
+        ? `化${f.mutagen}=${f.star}→本宫（自化${f.mutagen}·离心）`
+        : `化${f.mutagen}=${f.star}→${f.toName}`
+    );
+    return `${pf.palaceName}(${pf.stem}${pf.branch})：${parts.join("，")}`;
+  });
+  return {
+    palaces,
+    sentences,
+    note: "宫干四化=该宫对他宫的因果投射（如财帛宫化忌入夫妻=为配偶/感情付出金钱）。离心自化=本宫气外泄不聚；向心自化=对宫牵引入本宫。忌入某宫=纠缠沉淀，忌落对宫即冲本宫=变动更烈。",
+  };
+}
+
+/* ─────────────── 四、夹宫关系 ─────────────── */
+
+export type JiaGong = {
+  palaceIndex: number;
+  palaceName: string;
+  branch: string;
+  kind: string;
+  good: boolean;
+  detail: string;
+};
+
+const JIA_PAIRS: { kind: string; s1: string; s2: string; good: boolean; note: string }[] = [
+  { kind: "左右夹", s1: "左辅", s2: "右弼", good: true, note: "贵人扶持，稳固" },
+  { kind: "昌曲夹", s1: "文昌", s2: "文曲", good: true, note: "文星辅佑，利科名" },
+  { kind: "魁钺夹", s1: "天魁", s2: "天钺", good: true, note: "贵人夹命，机遇多" },
+  { kind: "日月夹", s1: "太阳", s2: "太阴", good: true, note: "日月夹辅，不权则富" },
+  { kind: "羊陀夹", s1: "擎羊", s2: "陀罗", good: false, note: "羊陀相夹（本宫必坐禄存），束缚牵制" },
+  { kind: "火铃夹", s1: "火星", s2: "铃星", good: false, note: "火铃夹制，急躁受迫" },
+  { kind: "空劫夹", s1: "地空", s2: "地劫", good: false, note: "空劫相夹，财福易漏" },
+];
+
+export function getJiaGong(a: Astrolabe): JiaGong[] {
+  const ix = buildChartIndex(a);
+  const out: JiaGong[] = [];
+  for (const p of a.palaces) {
+    const prev = new Set(starNamesAt(a, p.index - 1));
+    const next = new Set(starNamesAt(a, p.index + 1));
+    const both = (x: string, y: string) => (prev.has(x) && next.has(y)) || (prev.has(y) && next.has(x));
+    for (const pair of JIA_PAIRS) {
+      if (both(pair.s1, pair.s2)) {
+        out.push({
+          palaceIndex: p.index,
+          palaceName: p.name,
+          branch: p.earthlyBranch as string,
+          kind: pair.kind,
+          good: pair.good,
+          detail: pair.note,
+        });
+      }
+    }
+    // 禄忌夹：一邻有禄存或生年禄星，另一邻有生年忌星
+    const luSet = ["禄存", ix.natal[0]].filter(Boolean) as string[];
+    const jiStar = ix.natal[3];
+    if (jiStar) {
+      const hasLu = (s: Set<string>) => luSet.some((n) => s.has(n));
+      if ((hasLu(prev) && next.has(jiStar)) || (hasLu(next) && prev.has(jiStar))) {
+        out.push({
+          palaceIndex: p.index,
+          palaceName: p.name,
+          branch: p.earthlyBranch as string,
+          kind: "禄忌夹",
+          good: false,
+          detail: "禄忌相夹，吉中藏纠缠、进退两难",
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/* ─────────────── 五、格局检测 ─────────────── */
+
+export type Pattern = {
+  name: string;
+  kind: "吉" | "凶" | "注意";
+  where: string;
+  basis: string;
+  meaning: string;
+  classic?: string;
+  flaw?: string;
+};
+
+export function detectPatterns(a: Astrolabe): Pattern[] {
+  const ix = buildChartIndex(a);
+  const S = ix.soulIdx;
+  if (S < 0) return [];
+  const out: Pattern[] = [];
+
+  const soul = a.palaces[S];
+  const soulBranch = soul.earthlyBranch as string;
+  const soulMajors = new Set(soul.majorStars.map((s) => s.name as string));
+  const soulAll = new Set(starNamesAt(a, S));
+  const sfIdx = sanfangIdx(S);
+  const sfStars = new Set<string>(sfIdx.flatMap((q) => starNamesAt(a, q)));
+  const prevSet = new Set(starNamesAt(a, S - 1));
+  const nextSet = new Set(starNamesAt(a, S + 1));
+
+  const pName = (i: number) => {
+    const p = a.palaces[fixIndex(i)];
+    return `${p.name}(${p.earthlyBranch})`;
+  };
+  const at = (star: string) => {
+    const i = ix.pos.get(star);
+    return i == null ? "?" : pName(i);
+  };
+  const soulWhere = `命宫(${soulBranch})`;
+  const brightOf = (star: string) => ix.bright.get(star) ?? "";
+  const jiStar = ix.natal[3];
+  const luStar = ix.natal[0];
+
+  /** 命三方四正的煞忌瑕疵（吉格通用破格检查） */
+  const soulFlaw = (): string | undefined => {
+    const bad: string[] = [];
+    sfIdx.forEach((q, k) => {
+      const tag = k === 0 ? "本宫" : k === 1 ? "对宫" : "三合";
+      for (const n of starNamesAt(a, q)) {
+        if (SHA_STARS.includes(n)) bad.push(`${n}(${tag})`);
+        else if (n === jiStar) bad.push(`${n}化忌(${tag})`);
+      }
+    });
+    return bad.length ? `命宫三方四正见 ${bad.join("、")}，成格带瑕，力量打折` : undefined;
+  };
+
+  const add = (p: Pattern) => out.push(p);
+  const addSoulGood = (p: Omit<Pattern, "kind" | "where" | "flaw">) =>
+    add({ ...p, kind: "吉", where: soulWhere, flaw: soulFlaw() });
+
+  /* —— 命宫主星结构 —— */
+  if (soulMajors.has("紫微") && soulMajors.has("天府")) {
+    addSoulGood({
+      name: "紫府同宫",
+      basis: `紫微、天府同守命宫（${soulBranch}）`,
+      meaning: "帝座与财库同宫，气象宏大，终身衣禄丰足",
+      classic: "「紫府同宫，终身福厚」——《紫微斗数全书·骨髓赋》",
+    });
+  } else if (sfStars.has("紫微") && sfStars.has("天府")) {
+    addSoulGood({
+      name: "紫府朝垣",
+      basis: `紫微在${at("紫微")}、天府在${at("天府")}，会照命宫三方四正`,
+      meaning: "紫府来朝，一生多贵人提携、根基厚",
+    });
+  }
+
+  if (!soulMajors.has("天府") && !soulMajors.has("天相") && sfStars.has("天府") && sfStars.has("天相")) {
+    addSoulGood({
+      name: "府相朝垣",
+      basis: `天府在${at("天府")}、天相在${at("天相")}，朝拱命宫`,
+      meaning: "库星印星拱命，稳中求进，宜从政从商任要职",
+      classic: "「天府天相乃为衣禄之神，为仕为官定主亨通之兆」——《紫微斗数全书·太微赋》",
+    });
+  }
+
+  if (soulMajors.has("紫微") && sfStars.has("左辅") && sfStars.has("右弼")) {
+    addSoulGood({
+      name: "君臣庆会",
+      basis: `紫微守命，左辅（${at("左辅")}）右弼（${at("右弼")}）会照`,
+      meaning: "帝星得辅弼，统御力强，可担大任",
+      classic: "「君臣庆会，材擅经邦」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  if (["天机", "太阴", "天同", "天梁"].every((s) => sfStars.has(s))) {
+    addSoulGood({
+      name: "机月同梁",
+      basis: "天机、太阴、天同、天梁齐会命宫三方四正",
+      meaning: "思虑周密、宜幕僚/文职/公门/专业技术，稳定中成就",
+      classic: "「机月同梁作吏人」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  const sblStar = ["七杀", "破军", "贪狼"].find((s) => soulMajors.has(s));
+  if (sblStar) {
+    add({
+      name: "杀破狼",
+      kind: "注意",
+      where: soulWhere,
+      basis: `命坐${sblStar}，三方必会${["七杀", "破军", "贪狼"].filter((s) => s !== sblStar).join("、")}`,
+      meaning: "人生主变动开创、大起大落，宜武职/创业/技术攻坚，忌守成",
+    });
+  }
+
+  if (soul.majorStars.length === 0) {
+    const opp = a.palaces[fixIndex(S + 6)];
+    add({
+      name: "命无正曜",
+      kind: "注意",
+      where: soulWhere,
+      basis: `命宫无主星，借对宫【${opp.name}】${opp.majorStars.map((s) => s.name).join("、") || "（对宫亦空）"}论`,
+      meaning: "个性随环境塑造、可塑性强，吉凶随借星与会照而定",
+    });
+  }
+
+  /* —— 特定星+宫位 —— */
+  const soulSeat = (star: string, branches: string[], p: Omit<Pattern, "kind" | "where" | "flaw">) => {
+    if (soulMajors.has(star) && branches.includes(soulBranch)) addSoulGood(p);
+  };
+
+  if (["卯", "酉"].includes(soulBranch) && soulMajors.has("紫微") && soulMajors.has("贪狼")) {
+    add({
+      name: "极居卯酉",
+      kind: "注意",
+      where: soulWhere,
+      basis: `紫微、贪狼同守命于${soulBranch}`,
+      meaning: "帝星遇桃花于四败之地，多哲学/宗教/艺术缘分；逢空劫尤主方外之志",
+      classic: "「极居卯酉遇劫空，十人之命九为僧」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  if (["卯", "酉"].includes(soulBranch) && soulMajors.has("巨门") && soulMajors.has("天机")) {
+    addSoulGood({
+      name: "巨机同临",
+      basis: `巨门、天机同守命于${soulBranch}`,
+      meaning: "口才机变出众，卯宫为佳（巨机居卯格），利言语/企划/传播",
+    });
+  }
+  if (["寅", "申"].includes(soulBranch) && soulMajors.has("巨门") && soulMajors.has("太阳")) {
+    addSoulGood({
+      name: "巨日同宫",
+      basis: `巨门、太阳同守命于${soulBranch}（寅优于申）`,
+      meaning: "光明磊落、以口才扬名，利外交/法律/教育",
+      classic: "「巨日同宫，官封三代」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  if (soulMajors.has("太阳") && soulMajors.has("太阴")) {
+    addSoulGood({
+      name: "日月同宫",
+      basis: `太阳、太阴同守命（${soulBranch}）`,
+      meaning: "阴阳并处，性格双面而才艺多端，丑未宫成局",
+    });
+  }
+  if (["辰", "戌"].includes(soulBranch) && soulMajors.has("天机") && soulMajors.has("天梁")) {
+    addSoulGood({
+      name: "善荫朝纲",
+      basis: `天机、天梁同守命于${soulBranch}`,
+      meaning: "机梁善谈兵，善筹划、宜军师/参谋/顾问之职",
+    });
+  }
+  if (["丑", "未"].includes(soulBranch) && soulMajors.has("武曲") && soulMajors.has("贪狼")) {
+    addSoulGood({
+      name: "武贪同行",
+      basis: `武曲、贪狼同守命于${soulBranch}`,
+      meaning: "财星遇欲望之星，先贫后富、三十后发",
+      classic: "「先贫后富，武贪同身命之宫」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  soulSeat("巨门", ["子", "午"], {
+    name: "石中隐玉",
+    basis: `巨门独守命于${soulBranch}`,
+    meaning: "才华内蕴、大器晚成，愈磨愈亮",
+    classic: "「巨门子午科权禄，石中隐玉福兴隆」——《紫微斗数全书》诗诀",
+  });
+  soulSeat("七杀", ["寅", "申", "子", "午"], {
+    name: ["寅", "申"].includes(soulBranch) ? "七杀朝斗" : "七杀仰斗",
+    basis: `七杀入庙守命于${soulBranch}`,
+    meaning: "将星得地，魄力过人，宜军警/外科/开创性事业",
+    classic: "「七杀朝斗，爵禄荣昌」——《紫微斗数全书》",
+  });
+  soulSeat("破军", ["子", "午"], {
+    name: "英星入庙",
+    basis: `破军入庙守命于${soulBranch}`,
+    meaning: "破军子午为英星，敢破敢立，横发之局",
+  });
+  soulSeat("武曲", ["辰", "戌", "丑", "未"], {
+    name: "将星得地",
+    basis: `武曲入庙守命于${soulBranch}`,
+    meaning: "财星入库地，刚毅果决，宜财经/实业",
+  });
+  soulSeat("太阳", ["午"], {
+    name: "日丽中天",
+    basis: "太阳守命于午（日之极旺）",
+    meaning: "光芒极盛，声名远播，宜公众事业；亦防过亢",
+  });
+  soulSeat("太阳", ["卯"], {
+    name: "日照雷门",
+    basis: "太阳守命于卯（旭日东升）",
+    meaning: "朝气蓬勃，早年即得发展",
+    classic: "「日照雷门，富贵荣华」——《紫微斗数全书》",
+  });
+  soulSeat("太阴", ["亥"], {
+    name: "月朗天门",
+    basis: "太阴守命于亥（月之旺地）",
+    meaning: "清贵之格，文名利禄兼得",
+    classic: "「月朗天门，进爵封侯」——《紫微斗数全书》诗诀",
+  });
+  if (soulBranch === "子" && soulMajors.has("天同") && soulMajors.has("太阴")) {
+    addSoulGood({
+      name: "水澄桂萼",
+      basis: "天同、太阴同守命于子（水乡月明）",
+      meaning: "清雅之贵，宜清要之职、学术文教",
+    });
+  }
+
+  // 明珠出海：未宫空命，日卯月亥来会
+  if (
+    soulBranch === "未" &&
+    soul.majorStars.length === 0 &&
+    ix.pos.get("太阳") != null &&
+    ix.pos.get("太阴") != null &&
+    a.palaces[ix.pos.get("太阳")!].earthlyBranch === "卯" &&
+    a.palaces[ix.pos.get("太阴")!].earthlyBranch === "亥"
+  ) {
+    addSoulGood({
+      name: "明珠出海",
+      basis: "未宫安命无正曜，太阳在卯、太阴在亥拱照",
+      meaning: "日月并明来朝，早岁扬名、贵显之格",
+    });
+  }
+
+  // 日月并明 / 反背 / 夹命
+  const sunB = brightOf("太阳");
+  const moonB = brightOf("太阴");
+  if (sfStars.has("太阳") && sfStars.has("太阴") && ["庙", "旺"].includes(sunB) && ["庙", "旺"].includes(moonB)) {
+    addSoulGood({
+      name: "日月并明",
+      basis: `太阳(${sunB})在${at("太阳")}、太阴(${moonB})在${at("太阴")}，俱旺会照命宫`,
+      meaning: "日月皆明，光被四表，主贵显",
+      classic: "「日月并明，佐九重于尧殿」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  if (sunB === "陷" && moonB === "陷") {
+    add({
+      name: "日月反背",
+      kind: "注意",
+      where: `太阳${at("太阳")}、太阴${at("太阴")}`,
+      basis: "太阳、太阴俱落陷（以全盘论）",
+      meaning: "日月失辉，早年辛劳、离乡背井反可成；忌自怨自艾",
+    });
+  }
+  if ((prevSet.has("太阳") && nextSet.has("太阴")) || (prevSet.has("太阴") && nextSet.has("太阳"))) {
+    addSoulGood({
+      name: "日月夹命",
+      basis: "太阳、太阴分居命宫两邻相夹",
+      meaning: "日月辅照，非贵即富",
+      classic: "「日月夹命、夹财，不权则富」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  /* —— 吉助会照 —— */
+  if (ix.natal[0] && ix.natal[1] && ix.natal[2]) {
+    const hit = [0, 1, 2].every((k) => sfStars.has(ix.natal[k]));
+    if (hit) {
+      addSoulGood({
+        name: "三奇加会",
+        basis: `生年化禄(${ix.natal[0]})、化权(${ix.natal[1]})、化科(${ix.natal[2]})俱会命宫三方四正`,
+        meaning: "禄权科三奇拱命，才干、机遇、名望齐备，大格",
+        classic: "「科权禄拱，名誉昭彰」——《紫微斗数全书·骨髓赋》",
+      });
+    }
+  }
+  if (sfStars.has("禄存") && luStar && sfStars.has(luStar)) {
+    addSoulGood({
+      name: "双禄朝垣",
+      basis: `禄存(${at("禄存")})与生年化禄星${luStar}(${at(luStar)})同会命宫三方`,
+      meaning: "双禄交会，一生财源不断",
+    });
+  }
+  // 禄马交驰：天马与禄存/化禄同宫（最标准），或同会命三方
+  const horsePos = ix.pos.get("天马");
+  if (horsePos != null) {
+    const horseMates = starNamesAt(a, horsePos);
+    const luHere = horseMates.includes("禄存") || (luStar ? horseMates.includes(luStar) : false);
+    if (luHere) {
+      add({
+        name: "禄马交驰",
+        kind: "吉",
+        where: pName(horsePos),
+        basis: `天马与${horseMates.includes("禄存") ? "禄存" : `化禄星${luStar}`}同宫于${pName(horsePos)}`,
+        meaning: "禄随马动，越动越发，利远方求财/外地发展",
+        flaw: sfIdx.includes(horsePos) ? soulFlaw() : undefined,
+      });
+    } else if (sfStars.has("天马") && (sfStars.has("禄存") || (luStar && sfStars.has(luStar)))) {
+      addSoulGood({
+        name: "禄马交驰（会照）",
+        basis: "天马与禄存/化禄分处命宫三方四正交会",
+        meaning: "动中得财，宜奔波经营、异地开拓",
+      });
+    }
+  }
+  if (["太阳", "天梁", "文昌"].every((s) => sfStars.has(s)) && (sfStars.has("禄存") || (luStar && sfStars.has(luStar)))) {
+    addSoulGood({
+      name: "阳梁昌禄",
+      basis: `太阳(${at("太阳")})、天梁(${at("天梁")})、文昌(${at("文昌")})与禄会于命宫三方`,
+      meaning: "考试功名第一格，利学业、科举、体制内晋升",
+      classic: "「阳梁昌禄，胪传第一名」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  const oppSet = new Set(starNamesAt(a, S + 6));
+  if (
+    (soulAll.has("天魁") && oppSet.has("天钺")) ||
+    (soulAll.has("天钺") && oppSet.has("天魁"))
+  ) {
+    addSoulGood({
+      name: "坐贵向贵",
+      basis: "天魁、天钺一坐命宫一居对宫相向",
+      meaning: "贵人前后相扶，逢凶有解、机会常至",
+      classic: "「魁钺命身多折桂」——《紫微斗数全书》",
+    });
+  }
+  if (prevSet.has("天魁") && nextSet.has("天钺") || prevSet.has("天钺") && nextSet.has("天魁")) {
+    addSoulGood({
+      name: "魁钺夹命",
+      basis: "天魁、天钺夹命宫",
+      meaning: "贵人相夹，暗中多助力",
+    });
+  }
+  if ((prevSet.has("文昌") && nextSet.has("文曲")) || (prevSet.has("文曲") && nextSet.has("文昌"))) {
+    addSoulGood({
+      name: "昌曲夹命",
+      basis: "文昌、文曲夹命宫",
+      meaning: "文星相夹，聪慧儒雅、利文途",
+    });
+  }
+  if ((prevSet.has("左辅") && nextSet.has("右弼")) || (prevSet.has("右弼") && nextSet.has("左辅"))) {
+    addSoulGood({
+      name: "左右夹命",
+      basis: "左辅、右弼夹命宫",
+      meaning: "辅弼相夹，根基稳固、得力于团队",
+    });
+  }
+  if (soulAll.has("左辅") && soulAll.has("右弼")) {
+    addSoulGood({
+      name: "左右同宫",
+      basis: "左辅、右弼同守命宫",
+      meaning: "众望所归，一呼百应",
+      classic: "「左右同宫，披罗衣紫」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  if (soulAll.has("文昌") && soulAll.has("文曲")) {
+    addSoulGood({
+      name: "文桂文华",
+      basis: "文昌、文曲同守命宫",
+      meaning: "昌曲同宫，才学出众、气质文雅",
+    });
+  }
+
+  /* —— 凶/注意类 —— */
+  const luCunPos = ix.pos.get("禄存");
+  if (luCunPos != null && jiStar && starNamesAt(a, luCunPos).includes(jiStar)) {
+    add({
+      name: "羊陀夹忌",
+      kind: "凶",
+      where: pName(luCunPos),
+      basis: `生年化忌星${jiStar}与禄存同宫（禄存必被擎羊、陀罗相夹）`,
+      meaning: "忌星受夹无路可出，该宫事项多阻滞破败，为斗数著名败局",
+      classic: "「羊陀夹忌为败局」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  if ((prevSet.has("火星") && nextSet.has("铃星")) || (prevSet.has("铃星") && nextSet.has("火星"))) {
+    add({
+      name: "火铃夹命",
+      kind: "凶",
+      where: soulWhere,
+      basis: "火星、铃星夹命宫",
+      meaning: "两煞相迫，性急多波折；命宫有贪狼反主奋发",
+      classic: "「火铃夹命为败局」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+  if ((prevSet.has("地空") && nextSet.has("地劫")) || (prevSet.has("地劫") && nextSet.has("地空"))) {
+    add({
+      name: "空劫夹命",
+      kind: "凶",
+      where: soulWhere,
+      basis: "地空、地劫夹命宫",
+      meaning: "财福两空之夹，宜技术/哲思立身，忌投机",
+    });
+  }
+  if (soulAll.has("地空") || soulAll.has("地劫")) {
+    const both = soulAll.has("地空") && soulAll.has("地劫");
+    add({
+      name: "命里逢空",
+      kind: "注意",
+      where: soulWhere,
+      basis: `${["地空", "地劫"].filter((s) => soulAll.has(s)).join("、")}坐命${both ? "（空劫同坐，力重）" : ""}`,
+      meaning: "精神性强、不重物欲，宜创意/玄学/技术，理财宜保守",
+    });
+  }
+  // 火贪/铃贪（全盘检索，注明是否关联命三方）
+  const tanPos = ix.pos.get("贪狼");
+  if (tanPos != null) {
+    const mates = starNamesAt(a, tanPos);
+    for (const fire of ["火星", "铃星"]) {
+      if (mates.includes(fire)) {
+        add({
+          name: fire === "火星" ? "火贪格" : "铃贪格",
+          kind: "吉",
+          where: pName(tanPos),
+          basis: `贪狼与${fire}同宫于${pName(tanPos)}${sfIdx.includes(tanPos) ? "（在命宫三方四正内）" : ""}`,
+          meaning: "横发之格，突发财名；防暴起暴落，得而善守为要",
+          classic: "「贪狼火星居庙旺，名镇诸邦」——《紫微斗数全书》诗诀",
+        });
+      }
+    }
+    if (["亥", "子"].includes(a.palaces[tanPos].earthlyBranch as string) && tanPos === S) {
+      add({
+        name: "泛水桃花",
+        kind: "注意",
+        where: soulWhere,
+        basis: `贪狼坐命于${soulBranch}（水乡）`,
+        meaning: "魅力强、人缘广，感情丰富须自律",
+        classic: "「贪居亥子，名为泛水桃花」——《紫微斗数全书》",
+      });
+    }
+    if (tanPos === S && soulAll.has("陀罗")) {
+      add({
+        name: "风流彩杖",
+        kind: "注意",
+        where: soulWhere,
+        basis: "贪狼与陀罗同守命宫",
+        meaning: "因情多纠缠、因欲生波折，感情事须节制",
+      });
+    }
+  }
+  // 刑忌夹印 / 财荫夹印（对每个天相宫检查）
+  const xiangPos = ix.pos.get("天相");
+  if (xiangPos != null) {
+    const xp = a.palaces[xiangPos];
+    const n1 = new Set(starNamesAt(a, xiangPos - 1));
+    const n2 = new Set(starNamesAt(a, xiangPos + 1));
+    const hasXing = (s: Set<string>) => s.has("擎羊") || s.has("天刑");
+    const hasJi = (s: Set<string>) => (jiStar ? s.has(jiStar) : false);
+    const hasLu = (s: Set<string>) => s.has("禄存") || (luStar ? s.has(luStar) : false);
+    const hasYin = (s: Set<string>) => s.has("天梁");
+    if ((hasXing(n1) && hasJi(n2)) || (hasXing(n2) && hasJi(n1))) {
+      add({
+        name: "刑忌夹印",
+        kind: "凶",
+        where: `${xp.name}(${xp.earthlyBranch})`,
+        basis: "天相（印星）被刑（擎羊/天刑）与化忌相夹",
+        meaning: "掌印之星受制，该宫事项易受掣肘、有责无权，防文书官非",
+      });
+    }
+    if ((hasYin(n1) && hasLu(n2)) || (hasYin(n2) && hasLu(n1))) {
+      add({
+        name: "财荫夹印",
+        kind: "吉",
+        where: `${xp.name}(${xp.earthlyBranch})`,
+        basis: "天相被天梁（荫）与禄（禄存/化禄）相夹",
+        meaning: "财荫护印，该宫事项得庇荫周全、稳中得利",
+      });
+    }
+  }
+  // 禄逢冲破
+  const luPositions: { star: string; idx: number }[] = [];
+  if (luCunPos != null) luPositions.push({ star: "禄存", idx: luCunPos });
+  if (luStar && ix.pos.get(luStar) != null) luPositions.push({ star: `化禄星${luStar}`, idx: ix.pos.get(luStar)! });
+  for (const lp of luPositions) {
+    if (!jiStar) break;
+    const sameJi = starNamesAt(a, lp.idx).includes(jiStar);
+    const oppJi = starNamesAt(a, lp.idx + 6).includes(jiStar);
+    const kongJie = starNamesAt(a, lp.idx).filter((n) => n === "地空" || n === "地劫");
+    if (sameJi || oppJi || kongJie.length) {
+      add({
+        name: "禄逢冲破",
+        kind: "注意",
+        where: pName(lp.idx),
+        basis: `${lp.star}${sameJi ? `与${jiStar}化忌同宫` : oppJi ? `被对宫${jiStar}化忌冲` : `与${kongJie.join("、")}同宫（禄遭空劫）`}`,
+        meaning: "吉处藏凶，财禄得而易失，该宫得利时防反复",
+        classic: "「禄逢冲破，吉处藏凶」——《紫微斗数全书·骨髓赋》",
+      });
+      break;
+    }
+  }
+  // 马头带箭
+  if (soulBranch === "午" && soulAll.has("擎羊")) {
+    add({
+      name: "马头带箭",
+      kind: "注意",
+      where: soulWhere,
+      basis: "擎羊坐命于午宫",
+      meaning: "威镇边疆之异格：得吉化则武贵横立功名，无吉则劳苦刑伤",
+      classic: "「马头带剑，镇御边疆」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  return out;
+}
+
+/* ─────────────── 汇总入口 ─────────────── */
+
+export type ChartAnalysis = {
+  note: string;
+  patterns: Pattern[];
+  sanfang: SanfangSnapshot[];
+  flyMatrix: FlyMatrix;
+  jiaGong: JiaGong[];
+  borrowed: BorrowedInfo[];
+};
+
+export function analyzeChart(a: Astrolabe): ChartAnalysis {
+  return {
+    note: "本节为确定性结构分析（与安星/四化同一口径算出）：patterns=格局检测（含成格瑕疵与古籍出处）；sanfang=每宫三方四正快照（会吉/会煞/四化会入已汇总，无需再数宫位）；flyMatrix=十二宫宫干四化飞宫全矩阵（含离心/向心自化）；jiaGong=夹宫关系；borrowed=空宫借星。分析时请直接引用本节结论。",
+    patterns: detectPatterns(a),
+    sanfang: getSanfangSnapshots(a),
+    flyMatrix: getFlyMatrix(a),
+    jiaGong: getJiaGong(a),
+    borrowed: getBorrowedStars(a),
+  };
+}
