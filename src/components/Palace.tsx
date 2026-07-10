@@ -10,11 +10,13 @@ export function PalaceCard({
   z,
   focus,
   onFocus,
+  onDetail,
 }: {
   palace: PalaceData;
   z: Zwds;
   focus: number;
   onFocus: (i: number) => void;
+  onDetail?: (i: number) => void;
 }) {
   const { horoscope, visible } = z;
   const i = palace.index;
@@ -69,6 +71,18 @@ export function PalaceCard({
 
   return (
     <div className={cls} style={{ gridArea: `g${i}` }} onClick={() => onFocus(i)}>
+      {isFocus && onDetail && (
+        <button
+          className="p-detail-btn"
+          title="宫位详情：三方四正快照 / 飞宫四化 / 格局 / 夹宫"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDetail(i);
+          }}
+        >
+          详
+        </button>
+      )}
       <div className="p-stars">
         <div className="p-major">
           {palace.majorStars.map((s) => (

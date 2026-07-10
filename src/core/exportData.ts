@@ -202,7 +202,7 @@ export function buildExportData(z: Zwds) {
     input,
     basic,
     palaces,
-    analysis: analyzeChart(a),
+    analysis: z.analysis ?? analyzeChart(a),
     horoscope,
     lifeKline: serializeLifeKline(z),
     /** L1 知识层：推理规则速查（Markdown 文本，供 AI 直接遵循） */
@@ -420,7 +420,7 @@ export function buildExportMd(z: Zwds): string | null {
   const a = z.astrolabe;
   if (!a) return null;
   const h = z.horoscope;
-  const an = analyzeChart(a);
+  const an = z.analysis ?? analyzeChart(a);
   const L: string[] = [];
 
   L.push(`# 紫微斗数命盘（AI 分析用）`);

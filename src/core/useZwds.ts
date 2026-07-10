@@ -28,6 +28,7 @@ import {
 } from "./lunar";
 import { resolveBirthPlace } from "./place";
 import { buildLifeKline } from "./lifeKline";
+import { analyzeChart } from "./analysis";
 
 export type Astrolabe = ReturnType<typeof astro.bySolar>;
 export type Horoscope = ReturnType<Astrolabe["horoscope"]>;
@@ -376,6 +377,9 @@ export function useZwds(input: BirthInput) {
     [astrolabe, decades, birthLunarYear]
   );
 
+  /** 结构分析（格局/飞宫/三方四正快照/夹宫/借星）：盘面弹层与 AI 导出共用 */
+  const analysis = useMemo(() => (astrolabe ? analyzeChart(astrolabe) : null), [astrolabe]);
+
   return {
     input,
     astrolabe,
@@ -398,6 +402,7 @@ export function useZwds(input: BirthInput) {
     trueSolar: effective.trueSolar,
     soulPalaceIndex,
     lifeKline,
+    analysis,
     actions,
   };
 }

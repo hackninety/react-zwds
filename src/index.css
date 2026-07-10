@@ -371,6 +371,47 @@ body {
   filter: drop-shadow(0 0 4px #55d7ff);
 }
 
+/* ── 飞宫四化连线（禄绿 权蓝 科金 忌紫） ── */
+.fly-line {
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 5 4;
+  animation: dashflow 0.9s linear infinite;
+  opacity: 0.9;
+}
+.fly-line[data-m="禄"] { stroke: var(--m-lu); }
+.fly-line[data-m="权"] { stroke: var(--m-quan); }
+.fly-line[data-m="科"] { stroke: var(--m-ke); }
+.fly-line[data-m="忌"] { stroke: var(--m-ji); stroke-dasharray: none; stroke-width: 2; }
+
+.fly-dot[data-m="禄"] { fill: var(--m-lu); }
+.fly-dot[data-m="权"] { fill: var(--m-quan); }
+.fly-dot[data-m="科"] { fill: var(--m-ke); }
+.fly-dot[data-m="忌"] { fill: var(--m-ji); }
+
+.fly-label {
+  font-size: 11px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(4, 8, 18, 0.9);
+  stroke-width: 3px;
+}
+.fly-label[data-m="禄"] { fill: var(--m-lu); }
+.fly-label[data-m="权"] { fill: var(--m-quan); }
+.fly-label[data-m="科"] { fill: var(--m-ke); }
+.fly-label[data-m="忌"] { fill: var(--m-ji); }
+
+.fly-selfdot {
+  fill: none;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 3 3;
+}
+.fly-selfdot[data-m="禄"] { stroke: var(--m-lu); }
+.fly-selfdot[data-m="权"] { stroke: var(--m-quan); }
+.fly-selfdot[data-m="科"] { stroke: var(--m-ke); }
+.fly-selfdot[data-m="忌"] { stroke: var(--m-ji); }
+
 /* ── 宫位 ── */
 .palace {
   position: relative;
@@ -384,6 +425,29 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.22s, box-shadow 0.22s;
+}
+
+/* 宫位详情按钮（选中宫右上角） */
+.p-detail-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: rgba(9, 14, 30, 0.9);
+  color: var(--cyan);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.p-detail-btn:hover {
+  background: rgba(85, 215, 255, 0.18);
+  box-shadow: 0 0 8px rgba(85, 215, 255, 0.4);
 }
 
 .palace:hover {
@@ -851,6 +915,9 @@ body {
 .db-hourly.on { background: var(--c-hourly); color: #2b0716; border-color: transparent; box-shadow: 0 0 13px rgba(255, 119, 183, 0.6); }
 .db-today { color: var(--gold); border-color: rgba(243, 201, 107, 0.4); }
 .db-today:hover { box-shadow: 0 0 12px rgba(243, 201, 107, 0.4); color: var(--gold); }
+.db-fly { color: var(--m-lu); border-color: rgba(52, 211, 153, 0.4); }
+.db-fly:hover { box-shadow: 0 0 12px rgba(52, 211, 153, 0.4); color: var(--m-lu); }
+.db-fly.on { background: var(--m-lu); color: #03140b; border-color: transparent; box-shadow: 0 0 13px rgba(52, 211, 153, 0.6); }
 
 /* ── 底部运限拨盘 ── */
 .hbar {
@@ -1265,3 +1332,175 @@ body {
   .center { overflow-y: auto; }
   .target-line { margin-top: 6px; }
 }
+
+/* ── 宫位详情弹层 ── */
+.pd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 6, 14, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.pd-panel {
+  width: min(560px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: linear-gradient(170deg, rgba(16, 25, 50, 0.97), rgba(9, 14, 30, 0.99));
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 0 40px rgba(85, 215, 255, 0.15), 0 18px 50px rgba(0, 0, 0, 0.6);
+  font-size: 0.8rem;
+}
+
+.pd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.pd-head b {
+  font-size: 1rem;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+.pd-gz {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--gold);
+}
+
+.pd-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pd-close:hover { color: var(--text); border-color: var(--line-strong); }
+
+.pd-panel section { margin-bottom: 12px; }
+
+.pd-panel h4 {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  color: var(--cyan);
+}
+
+.pd-seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pd-seats li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--dim);
+}
+
+.pd-seats b { color: var(--text); font-weight: 600; flex: none; }
+
+.pd-role {
+  flex: none;
+  width: 34px;
+  text-align: center;
+  font-style: normal;
+  font-size: 0.68rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.pd-role-self { color: #fff; border-color: rgba(255, 255, 255, 0.5); }
+.pd-role-opp { color: var(--gold); border-color: rgba(243, 201, 107, 0.5); }
+.pd-role-trine { color: var(--cyan); border-color: rgba(85, 215, 255, 0.4); }
+
+.pd-borrow { margin: 6px 0 0; color: var(--gold); font-size: 0.74rem; }
+
+.pd-tags p { margin: 5px 0 0; color: var(--dim); line-height: 1.5; }
+
+.pd-k {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  font-style: normal;
+  font-size: 0.68rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.pd-k-good { color: var(--m-lu); border-color: rgba(52, 211, 153, 0.5); }
+.pd-k-bad { color: var(--m-ji); border-color: rgba(227, 91, 216, 0.5); }
+.pd-k-mut { color: var(--m-ke); border-color: rgba(251, 191, 36, 0.5); }
+
+.pd-flies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text);
+}
+
+.pd-mut {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 7px;
+  text-align: center;
+  font-style: normal;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  color: #06101f;
+}
+
+.pd-mut[data-m="禄"] { background: var(--m-lu); }
+.pd-mut[data-m="权"] { background: var(--m-quan); }
+.pd-mut[data-m="科"] { background: var(--m-ke); }
+.pd-mut[data-m="忌"] { background: var(--m-ji); color: #fff; }
+
+.pd-inward { margin: 6px 0 0; color: var(--dim); font-size: 0.74rem; }
+
+.pd-pattern { margin-bottom: 8px; }
+.pd-pattern b { color: var(--text); }
+.pd-pattern p { margin: 2px 0; color: var(--dim); line-height: 1.5; }
+.pd-meaning { color: var(--text) !important; }
+.pd-classic { color: var(--gold) !important; font-size: 0.74rem; }
+.pd-flaw { color: var(--m-ji) !important; font-size: 0.74rem; }
+
+.pd-kind {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-style: normal;
+  font-size: 0.66rem;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.pd-kind-吉 { color: var(--m-lu); border-color: rgba(52, 211, 153, 0.5); }
+.pd-kind-凶 { color: var(--m-ji); border-color: rgba(227, 91, 216, 0.5); }
+.pd-kind-注意 { color: var(--m-ke); border-color: rgba(251, 191, 36, 0.5); }
+
+.pd-jia { margin: 4px 0; color: var(--dim); }

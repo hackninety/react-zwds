@@ -3,8 +3,16 @@ import type { Zwds } from "../core/useZwds";
 
 const PILLAR_LABELS = ["年", "月", "日", "时"];
 
-/** 中宫：命盘信息 + 观测点 + 本限年月日时切换 */
-export function CenterPanel({ z }: { z: Zwds }) {
+/** 中宫：命盘信息 + 观测点 + 本限年月日时切换 + 飞宫模式 */
+export function CenterPanel({
+  z,
+  flyMode = false,
+  onToggleFly,
+}: {
+  z: Zwds;
+  flyMode?: boolean;
+  onToggleFly?: () => void;
+}) {
   const a = z.astrolabe;
   if (!a) return <div className="center" style={{ gridArea: "c" }} />;
 
@@ -132,6 +140,15 @@ export function CenterPanel({ z }: { z: Zwds }) {
         <button className="db db-today" onClick={z.actions.resetToday} title="回到今天">
           今
         </button>
+        {onToggleFly && (
+          <button
+            className={`db db-fly ${flyMode ? "on" : ""}`}
+            onClick={onToggleFly}
+            title="飞宫模式：点任一宫，显示该宫宫干四化飞入何宫（禄绿·权蓝·科金·忌紫）；再点关闭恢复三方四正连线"
+          >
+            飞
+          </button>
+        )}
       </div>
     </div>
   );
