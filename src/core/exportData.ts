@@ -7,7 +7,12 @@ import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
 import { MUTAGEN_CHARS, MUTAGEN_TABLE_LABEL, SCOPE_META, STEMS, fixIndex, type Scope } from "./utils";
 import { lunarToSolarStr } from "./lunar";
 import { encode as toonEncode } from "@toon-format/toon";
-import { analyzeChart, type ChartAnalysis } from "./analysis";
+import {
+  analyzeChart,
+  detectHoroscopePatterns,
+  type ChartAnalysis,
+  type HoroPattern,
+} from "./analysis";
 import { buildMonthlyKline } from "./lifeKline";
 import { RULEBOOK_MD, STAR_MUTAGEN_MD, topicGuidesMd } from "./knowledge";
 
@@ -103,6 +108,29 @@ function schoolLabel(algorithm: string): string {
     : "南派三合（《紫微斗数全书》通行版）";
 }
 
+/** 当前大限+流年的运限格局扫描（以运限命宫三方为中心） */
+function horoscopePatternsOf(z: Zwds): { decadal: HoroPattern[]; yearly: HoroPattern[] } | null {
+  const a = z.astrolabe;
+  const h = z.horoscope;
+  if (!a || !h) return null;
+  return {
+    decadal: detectHoroscopePatterns(
+      a,
+      "decadal",
+      h.decadal.index,
+      h.decadal.heavenlyStem as string,
+      h.decadal.earthlyBranch as string
+    ),
+    yearly: detectHoroscopePatterns(
+      a,
+      "yearly",
+      h.yearly.index,
+      h.yearly.heavenlyStem as string,
+      h.yearly.earthlyBranch as string
+    ),
+  };
+}
+
 export function buildExportData(z: Zwds) {
   const a = z.astrolabe;
   if (!a) return null;
@@ -196,6 +224,8 @@ export function buildExportData(z: Zwds) {
         yearsOfCurrentDecade: z.years,
         allDecadals: getAllDecadals(z),
         monthlyOfCurrentYear: getMonthlyOfYear(z),
+        /** 运限格局扫描：以大限/流年命宫三方为中心（本命星曜+运限四化+运限流曜） */
+        horoscopePatterns: horoscopePatternsOf(z),
       }
     : null;
 
@@ -554,6 +584,29 @@ export function buildExportMd(z: Zwds): string | null {
       }） → 流时 ${z.hours[z.pick.hour]?.label ?? ""}（${z.hours[z.pick.hour]?.gz ?? ""}）`
     );
     L.push("");
+
+    /* 运限格局提示（程序确定性扫描） */
+    const hp = horoscopePatternsOf(z);
+    if (hp && (hp.decadal.length || hp.yearly.length)) {
+      L.push(`### 运限格局提示（以运限命宫三方扫描，直接引用勿重推）`);
+      L.push("");
+      const dump = (label: string, list: HoroPattern[]) => {
+        if (!list.length) {
+          L.push(`- ${label}：未检出显著运限格局`);
+          return;
+        }
+        for (const p of list) {
+          L.push(`- ${label}【${p.name}】〔${p.kind}〕${p.basis}——${p.meaning}`);
+        }
+      };
+      dump(
+        `大限（${dec ? `${dec.heavenlyStem}${dec.earthlyBranch} ${dec.range[0]}~${dec.range[1]}岁` : "童限"}）`,
+        hp.decadal
+      );
+      dump(`流年（${z.pick.year} ${h.yearly.heavenlyStem}${h.yearly.earthlyBranch}）`, hp.yearly);
+      L.push("");
+    }
+
     L.push(scopeSection(a, "decadal", h.decadal, `（${dec ? `${dec.range[0]}~${dec.range[1]}岁` : "童限"}）`));
     const ageSeat = a.palaces[h.age.index];
     L.push(`### 小限（虚岁 ${h.age.nominalAge}）`);

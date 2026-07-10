@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { astro, util } from "iztro";
 import {
   analyzeChart,
+  detectHoroscopePatterns,
   detectPatterns,
   getBorrowedStars,
   getFlyMatrix,
@@ -106,6 +107,76 @@ describe("analysis 结构分析层", () => {
     for (const b of borrowed) {
       expect(a.palaces[b.palaceIndex].majorStars).toHaveLength(0);
     }
+  });
+
+  it("扩充格局条件自洽（多组生辰独立复核）", () => {
+    const samples: [string, number, "男" | "女"][] = [
+      ["2000-08-16", 2, "男"],
+      ["1984-02-02", 0, "女"],
+      ["1990-05-20", 7, "女"],
+      ["1988-10-01", 4, "男"],
+      ["1975-12-31", 11, "男"],
+    ];
+    for (const [ds, t, g] of samples) {
+      const c = makeChart(ds, t, g);
+      const soul = c.palaces.find((p) => p.name === "命宫")!;
+      const br = soul.earthlyBranch as string;
+      const all = new Set(
+        [...soul.majorStars, ...soul.minorStars, ...soul.adjectiveStars].map((s) => s.name as string)
+      );
+      const names = detectPatterns(c).map((p) => p.name);
+      expect(names.includes("擎羊入庙")).toBe(all.has("擎羊") && ["辰", "戌", "丑", "未"].includes(br));
+      expect(names.includes("雄宿朝元")).toBe(
+        soul.majorStars.some((s) => s.name === "廉贞") && ["寅", "申"].includes(br)
+      );
+      expect(names.includes("寿星入庙")).toBe(soul.majorStars.some((s) => s.name === "天梁") && br === "午");
+      const prev = new Set(
+        [...c.palaces[fixIndex(soul.index - 1)].majorStars].map((s) => s.name as string)
+      );
+      const next = new Set(
+        [...c.palaces[fixIndex(soul.index + 1)].majorStars].map((s) => s.name as string)
+      );
+      expect(names.includes("紫府夹命")).toBe(
+        (prev.has("紫微") && next.has("天府")) || (prev.has("天府") && next.has("紫微"))
+      );
+    }
+  });
+
+  it("运限格局扫描：60 个流年遍历结构自洽且覆盖多种格局", () => {
+    const seen = new Set<string>();
+    for (let year = 1997; year < 2057; year++) {
+      const h = a.horoscope(`${year}-7-15`, 0);
+      const pats = detectHoroscopePatterns(
+        a,
+        "yearly",
+        h.yearly.index,
+        h.yearly.heavenlyStem as string,
+        h.yearly.earthlyBranch as string
+      );
+      for (const p of pats) {
+        expect(p.scope).toBe("yearly");
+        expect(["吉", "凶", "注意"]).toContain(p.kind);
+        expect(p.basis).toBeTruthy();
+        expect(p.meaning).toBeTruthy();
+        seen.add(p.name);
+      }
+    }
+    // 一甲子内应出现多种运限格局（杀破狼运/忌入·忌冲/双禄等）
+    expect(seen.size).toBeGreaterThanOrEqual(3);
+    expect([...seen].some((n) => n.includes("杀破狼") || n.includes("忌"))).toBe(true);
+  });
+
+  it("运限格局扫描：大限层可跑且确定性", () => {
+    const h = a.horoscope("2026-7-10", 0);
+    const run = () =>
+      detectHoroscopePatterns(
+        a,
+        "decadal",
+        h.decadal.index,
+        h.decadal.heavenlyStem as string,
+        h.decadal.earthlyBranch as string
+      );
+    expect(JSON.stringify(run())).toBe(JSON.stringify(run()));
   });
 
   it("analyzeChart 汇总入口各字段齐备（另抽多组生辰不抛错）", () => {

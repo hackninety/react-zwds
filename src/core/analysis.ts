@@ -6,8 +6,9 @@
  * 全部只读本命盘（Astrolabe），不依赖运限状态；四化表跟随 iztro 全局配置。
  */
 import { util } from "iztro";
+import { getHoroscopeStar } from "iztro/lib/star/horoscopeStar";
 import type { Astrolabe } from "./useZwds";
-import { MUTAGEN_CHARS, fixIndex } from "./utils";
+import { BRANCH_LIUHE, MUTAGEN_CHARS, fixIndex } from "./utils";
 
 /* ─────────────── 基础索引 ─────────────── */
 
@@ -809,6 +810,286 @@ export function detectPatterns(a: Astrolabe): Pattern[] {
       meaning: "威镇边疆之异格：得吉化则武贵横立功名，无吉则劳苦刑伤",
       classic: "「马头带剑，镇御边疆」——《紫微斗数全书·骨髓赋》",
     });
+  }
+
+  /* —— 格局库扩充 —— */
+
+  // 明禄暗禄：命坐禄（禄存/生年禄星），命宫地支的六合宫再见另一禄
+  {
+    const mingLu = soulAll.has("禄存") ? "禄存" : luStar && soulAll.has(luStar) ? `化禄星${luStar}` : null;
+    const anBranch = BRANCH_LIUHE[soulBranch];
+    const anSeat = a.palaces.find((p) => p.earthlyBranch === anBranch);
+    if (mingLu && anSeat) {
+      const anStars = starNamesAt(a, anSeat.index);
+      const anLu = anStars.includes("禄存")
+        ? "禄存"
+        : luStar && anStars.includes(luStar) && `化禄星${luStar}` !== mingLu
+          ? `化禄星${luStar}`
+          : null;
+      if (anLu && anLu !== mingLu) {
+        addSoulGood({
+          name: "明禄暗禄",
+          basis: `命宫坐${mingLu}（明禄），命支${soulBranch}六合之${anSeat.name}（${anBranch}）藏${anLu}（暗禄）`,
+          meaning: "明暗两禄相济，明财之外另有暗财/贵人暗助",
+          classic: "「明禄暗禄，锦上添花」——《紫微斗数全书·骨髓赋》",
+        });
+      }
+    }
+  }
+
+  if (luStar && ix.natal[1] && soulAll.has(luStar) && soulAll.has(ix.natal[1])) {
+    addSoulGood({
+      name: "权禄巡逢",
+      basis: `生年化禄星${luStar}与化权星${ix.natal[1]}同守命宫`,
+      meaning: "禄权同宫坐命，财与权柄相辅，务实进取",
+      classic: "「权禄重逢，财官双美」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  if (!soulAll.has("文昌") && !soulAll.has("文曲") && sfStars.has("文昌") && sfStars.has("文曲")) {
+    addSoulGood({
+      name: "文星拱命",
+      basis: `文昌（${at("文昌")}）、文曲（${at("文曲")}）自三方四正拱照命宫`,
+      meaning: "昌曲来拱，聪慧好学、利科名文途",
+    });
+  }
+
+  if (soulAll.has("擎羊") && ["辰", "戌", "丑", "未"].includes(soulBranch)) {
+    addSoulGood({
+      name: "擎羊入庙",
+      basis: `擎羊守命于${soulBranch}（四墓之地入庙）`,
+      meaning: "刑星入庙反主威权果决，宜武职/外科/竞技；仍带刑伤性，防刚极易折",
+    });
+  }
+
+  if (!soulAll.has("天魁") && !soulAll.has("天钺") && sfStars.has("天魁") && sfStars.has("天钺")) {
+    addSoulGood({
+      name: "天乙拱命",
+      basis: `天魁（${at("天魁")}）、天钺（${at("天钺")}）自三方四正拱照命宫`,
+      meaning: "双贵拱命，一生逢凶有解、机遇常至",
+    });
+  }
+
+  if ((prevSet.has("紫微") && nextSet.has("天府")) || (prevSet.has("天府") && nextSet.has("紫微"))) {
+    addSoulGood({
+      name: "紫府夹命",
+      basis: "紫微、天府分居命宫两邻相夹",
+      meaning: "帝库相夹，暗受提携，根基深厚",
+    });
+  }
+
+  if (soulMajors.has("廉贞") && ["寅", "申"].includes(soulBranch)) {
+    addSoulGood({
+      name: "雄宿朝元",
+      basis: `廉贞守命于${soulBranch}（庙地）`,
+      meaning: "廉贞入庙为雄宿，干练有为、宜公职武职；加会吉星方成大器",
+    });
+  }
+
+  if (soulMajors.has("天梁") && soulBranch === "午") {
+    addSoulGood({
+      name: "寿星入庙",
+      basis: "天梁守命于午（庙地）",
+      meaning: "荫星入庙，逢难有救、老成持重，利医药/监察/顾问",
+    });
+  }
+
+  if (soulMajors.has("巨门")) {
+    const shaHit = ["擎羊", "陀罗", "火星", "铃星"].filter((s) => sfStars.has(s));
+    if (shaHit.length >= 2) {
+      add({
+        name: "巨逢四煞",
+        kind: "凶",
+        where: soulWhere,
+        basis: `巨门守命，三方四正会${shaHit.join("、")}`,
+        meaning: "暗星会众煞，口舌是非加剧、防官非刑讼，言语谨慎为上",
+      });
+    }
+  }
+
+  if (ix.natal[1] && ix.natal[2]) {
+    const quan = ix.natal[1];
+    const ke = ix.natal[2];
+    if ((soulAll.has(ke) && oppSet.has(quan)) || (soulAll.has(quan) && oppSet.has(ke))) {
+      addSoulGood({
+        name: "科权对拱",
+        basis: `生年化科星${ke}与化权星${quan}一坐命宫一居对宫相拱`,
+        meaning: "名与权对拱，利考试晋升、名位相济",
+        classic: "「科权对拱，跃三汲于禹门」——《紫微斗数全书·骨髓赋》",
+      });
+    }
+  }
+
+  return out;
+}
+
+/* ─────────────── 运限格局扫描（大限/流年层） ─────────────── */
+
+export type HoroPattern = {
+  scope: "decadal" | "yearly";
+  name: string;
+  kind: "吉" | "凶" | "注意";
+  basis: string;
+  meaning: string;
+};
+
+/**
+ * 以运限命宫为中心扫描运限层格局：本命星曜三方会照 + 该运限四化引动 + 该运限流曜。
+ * 用于回答「这个大限/这一年是不是考运年/财运年/动荡年」。
+ *
+ * @param soulIdxOfScope 运限命宫所在的本命宫位索引（h.decadal.index / h.yearly.index）
+ * @param stem/branch    运限干支（四化与流曜由此起）
+ */
+export function detectHoroscopePatterns(
+  a: Astrolabe,
+  scope: "decadal" | "yearly",
+  soulIdxOfScope: number,
+  stem: string,
+  branch: string
+): HoroPattern[] {
+  const ix = buildChartIndex(a);
+  const S = fixIndex(soulIdxOfScope);
+  const sf = sanfangIdx(S);
+  const sfSet = new Set(sf);
+  const sfStars = new Set<string>(sf.flatMap((q) => starNamesAt(a, q)));
+  const tag = scope === "decadal" ? "大限" : "流年";
+  const out: HoroPattern[] = [];
+  const add = (name: string, kind: HoroPattern["kind"], basis: string, meaning: string) =>
+    out.push({ scope, name, kind, basis, meaning });
+
+  const mutStars = stem ? (util.getMutagensByHeavenlyStem(stem as never) as string[]) : [];
+  const posOf = (star: string) => ix.pos.get(star) ?? -1;
+  const inSf = (star: string) => sfSet.has(posOf(star));
+  const mutInSf = (k: number) => !!mutStars[k] && inSf(mutStars[k]);
+  const seatName = (i: number) => a.palaces[fixIndex(i)]?.name ?? "?";
+
+  /* 运限流曜（大限=运X / 流年=流X），键统一去前缀 */
+  const flowPos = new Map<string, number>();
+  try {
+    getHoroscopeStar(stem as never, branch as never, scope).forEach((g, idx) => {
+      for (const s of g) flowPos.set((s.name as string).slice(1), idx);
+    });
+  } catch {
+    /* 干支异常时无流曜 */
+  }
+  const flowIn = (short: string) => sfSet.has(flowPos.get(short) ?? -1);
+
+  // 三奇加会（运限）
+  if (mutInSf(0) && mutInSf(1) && mutInSf(2)) {
+    add(
+      "三奇加会（运限）",
+      "吉",
+      `${tag}化禄${mutStars[0]}、化权${mutStars[1]}、化科${mutStars[2]}俱会${tag}命宫三方四正`,
+      "运限三奇拱照，此运才干机遇名望齐至，宜大胆进取"
+    );
+  }
+
+  // 双禄交会：运限化禄会照 + 本命禄存/生年禄星亦在三方（非同星）
+  if (mutInSf(0)) {
+    const natalLuHere = sfStars.has("禄存") || (ix.natal[0] !== mutStars[0] && ix.natal[0] && sfStars.has(ix.natal[0]));
+    if (natalLuHere) {
+      add(
+        "双禄交会（运限）",
+        "吉",
+        `${tag}化禄（${mutStars[0]}）与本命禄（${sfStars.has("禄存") ? "禄存" : `生年禄星${ix.natal[0]}`}）同会${tag}命宫三方`,
+        "运限禄叠本命禄，财源双至，进财应期"
+      );
+    }
+  }
+
+  // 阳梁昌禄（运限）：太阳天梁+（本命文昌或流昌）+（运限禄或本命禄）
+  if (
+    sfStars.has("太阳") &&
+    sfStars.has("天梁") &&
+    (sfStars.has("文昌") || flowIn("昌")) &&
+    (mutInSf(0) || sfStars.has("禄存") || (ix.natal[0] && sfStars.has(ix.natal[0])))
+  ) {
+    add(
+      "阳梁昌禄（运限）",
+      "吉",
+      `太阳、天梁会${tag}命宫三方，文昌${sfStars.has("文昌") ? "" : `（${tag[0]}昌）`}与禄俱到`,
+      "考试功名应期：升学、考证、竞聘、体制晋升的窗口期"
+    );
+  }
+
+  // 禄马交驰（运限）：流禄/运限化禄 与 流马/本命天马 同会三方
+  {
+    const luIn = flowIn("禄") || mutInSf(0) || sfStars.has("禄存");
+    const maIn = flowIn("马") || sfStars.has("天马");
+    if (luIn && maIn && (flowIn("禄") || flowIn("马") || mutInSf(0))) {
+      add(
+        "禄马交驰（运限）",
+        "吉",
+        `禄（${flowIn("禄") ? `${tag[0]}禄` : mutInSf(0) ? `化禄${mutStars[0]}` : "禄存"}）与马（${flowIn("马") ? `${tag[0]}马` : "天马"}）同会${tag}命宫三方`,
+        "动中得财之运，宜外出经营、差旅开拓、异地机会"
+      );
+    }
+  }
+
+  // 羊陀夹忌（运限）：运限忌星恰落本命禄存之宫（必被羊陀所夹）
+  {
+    const jiStar = mutStars[3];
+    const luCunPos = ix.pos.get("禄存");
+    if (jiStar && luCunPos != null && posOf(jiStar) === luCunPos) {
+      add(
+        "羊陀夹忌（运限）",
+        "凶",
+        `${tag}化忌（${jiStar}）落入本命禄存之宫【${seatName(luCunPos)}】，受擎羊陀罗相夹`,
+        "此运忌星受夹无处可泄，该宫事项动辄得咎，宜守不宜攻"
+      );
+    }
+  }
+
+  // 忌入/忌冲运限命宫
+  {
+    const jiStar = mutStars[3];
+    const jiPos = jiStar ? posOf(jiStar) : -1;
+    if (jiPos === S) {
+      add(
+        "忌入运限命宫",
+        "注意",
+        `${tag}化忌（${jiStar}）坐${tag}命宫【${seatName(S)}】`,
+        "忌坐运限命，此运多自我纠结、执念沉淀，宜收敛整固"
+      );
+    } else if (jiPos === fixIndex(S + 6)) {
+      add(
+        "忌冲运限命宫",
+        "注意",
+        `${tag}化忌（${jiStar}）自对宫【${seatName(jiPos)}】冲${tag}命宫`,
+        "忌冲运限命，冲力最烈，主变动离散——换环境/换轨道的敏感期"
+      );
+    }
+  }
+
+  // 杀破狼运：运限命宫坐杀破狼
+  {
+    const sbl = a.palaces[S].majorStars.find((s) => ["七杀", "破军", "贪狼"].includes(s.name as string));
+    if (sbl) {
+      add(
+        "杀破狼运",
+        "注意",
+        `${tag}命宫坐${sbl.name}（三方必会齐杀破狼）`,
+        "变动开创之运：转型、跳槽、创业多发于此，宜主动求变忌被动硬守"
+      );
+    }
+  }
+
+  // 火贪/铃贪引动：贪狼在三方与火/铃同宫，且被本运四化引动（禄权忌任一）
+  {
+    const tanPos = ix.pos.get("贪狼");
+    if (tanPos != null && sfSet.has(tanPos)) {
+      const mates = starNamesAt(a, tanPos);
+      const fire = ["火星", "铃星"].find((f) => mates.includes(f));
+      const trigged = mutStars[0] === "贪狼" || mutStars[1] === "贪狼" || mutStars[3] === "贪狼";
+      if (fire && trigged) {
+        add(
+          "火贪引动（运限）",
+          "注意",
+          `贪狼与${fire}同宫于${seatName(tanPos)}（在${tag}命宫三方），且本${tag.charAt(1)}贪狼被四化引动`,
+          "横发格被引动：暴利与暴损同门，见好就收、落袋为安"
+        );
+      }
+    }
   }
 
   return out;
