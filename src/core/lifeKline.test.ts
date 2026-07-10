@@ -102,6 +102,32 @@ describe("lifeKline 评分引擎", () => {
     }
   });
 
+  it("小限落宫公式与 iztro 各宫 ages 一致（男顺女逆交叉验证）", () => {
+    // 与 lifeKline 内部同一公式：生年支三合起宫，男顺女逆
+    const AGE_START: Record<string, string> = {
+      寅: "辰", 午: "辰", 戌: "辰", 申: "戌", 子: "戌", 辰: "戌",
+      巳: "未", 酉: "未", 丑: "未", 亥: "丑", 卯: "丑", 未: "丑",
+    };
+    const BR = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+    const fix = (n: number) => ((n % 12) + 12) % 12;
+    for (const g of ["男", "女"] as const) {
+      const c = makeChart("2000-08-16", 2, g);
+      const yearBranch = c.chineseDate.split(" ")[0].charAt(1);
+      const start = fix(BR.indexOf(AGE_START[yearBranch]) - 2);
+      const dir = g === "女" ? -1 : 1;
+      for (let age = 1; age <= 24; age++) {
+        const idx = fix(start + dir * (age - 1));
+        expect(c.palaces[idx].ages).toContain(age);
+      }
+    }
+  });
+
+  it("小限因子出现在 factors", () => {
+    const all = lk.domains.flatMap((d) => d.years.flatMap((y) => y.factors)).join("|");
+    expect(all).toMatch(/小限入本宫/);
+    expect(all).toMatch(/小限冲本宫/);
+  });
+
   it("多组生辰跑通不抛错", () => {
     const samples: [string, number, "男" | "女"][] = [
       ["1984-02-02", 0, "女"],

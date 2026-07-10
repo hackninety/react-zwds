@@ -19,6 +19,7 @@
  *          + 流曜：流禄 +2w / 流羊·流陀 -2w / 流马 +1.5w（随年干支起,按位权 w）
  *          ※ 流马会禄（流禄/本命禄存/生年禄星同宫）→ 禄马交驰 +3
  *          ※ 流年化禄落生年忌宫 → 禄忌交缠·变动年 +2/-2（动能↑）
+ *          + 小限入本宫 +1 / 小限冲本宫 -1（男顺女逆,生年支三合起宫）
  *          + 命宫域岁限并临 -2
  *   收敛 [8,92]；K 线 open=上年 close,high/low 由进/出两股动能撑开。
  */
@@ -58,6 +59,11 @@ const LU_BRANCH: Record<string, string> = {
 const MA_BRANCH: Record<string, string> = {
   申: "寅", 子: "寅", 辰: "寅", 寅: "申", 午: "申", 戌: "申",
   巳: "亥", 酉: "亥", 丑: "亥", 亥: "巳", 卯: "巳", 未: "巳",
+};
+/** 小限起宫地支（生年支三合局）：寅午戌人辰上起、申子辰人戌上起、巳酉丑人未上起、亥卯未人丑上起 */
+const AGE_START_BRANCH: Record<string, string> = {
+  寅: "辰", 午: "辰", 戌: "辰", 申: "戌", 子: "戌", 辰: "戌",
+  巳: "未", 酉: "未", 丑: "未", 亥: "丑", 卯: "丑", 未: "丑",
 };
 /** 地支 → 宫位索引（palaces[0]=寅） */
 const branchPalaceIdx = (branch: string) => fixIndex(BRANCHES.indexOf(branch as never) - 2);
@@ -197,6 +203,15 @@ export function buildLifeKline(
 
   const natalYearStem = a.chineseDate.split(" ")[0]?.charAt(0) ?? "";
   const lastAge = Math.min(100, decades[decades.length - 1].range[1]);
+
+  /* 小限：生年支三合定起宫（寅午戌辰起…），男顺女逆，一岁一宫 */
+  const natalYearBranch = a.chineseDate.split(" ")[0]?.charAt(1) ?? "";
+  const ageStartIdx = AGE_START_BRANCH[natalYearBranch]
+    ? branchPalaceIdx(AGE_START_BRANCH[natalYearBranch])
+    : -1;
+  const ageDir = a.gender === "女" ? -1 : 1;
+  const smallLimitIdx = (age: number) =>
+    ageStartIdx < 0 ? -1 : fixIndex(ageStartIdx + ageDir * (age - 1));
 
   /* 大限段背景（含童限） */
   const bands: KlineBand[] = [];
@@ -366,6 +381,17 @@ export function buildLifeKline(
         drain += 2;
         nature.push("流禄引动生年忌·变动");
         factors.push("流禄引动生年忌（禄忌交缠，先得后失防反复） +2/-2");
+      }
+
+      // 小限落宫：入本宫=当年事聚此域（小幅关注），落对宫=小限冲（小幅动荡）
+      const ageIdx = smallLimitIdx(age);
+      if (ageIdx === P) {
+        gain += 1;
+        factors.push("小限入本宫 +1");
+      } else if (ageIdx >= 0 && ageIdx === fixIndex(P + 6)) {
+        drain += 1;
+        nature.push("小限冲本宫·小动");
+        factors.push("小限冲本宫 -1");
       }
 
       // 岁限并临（命宫域）：动荡
