@@ -4,7 +4,7 @@
  */
 import { util } from "iztro";
 import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
-import { MUTAGEN_CHARS, SCOPE_META, fixIndex, type Scope } from "./utils";
+import { MUTAGEN_CHARS, MUTAGEN_TABLE_LABEL, SCOPE_META, STEMS, fixIndex, type Scope } from "./utils";
 import { lunarToSolarStr } from "./lunar";
 import { analyzeChart, type ChartAnalysis } from "./analysis";
 import { RULEBOOK_MD } from "./knowledge";
@@ -66,20 +66,21 @@ function getAllDecadals(z: Zwds) {
   return results;
 }
 
-/** 当前流年的十二流月一览 */
+/** 当前流年的流月一览（含闰月位） */
 function getMonthlyOfYear(z: Zwds) {
   const { astrolabe, pick, months } = z;
   if (!astrolabe) return [];
   const results: Record<string, unknown>[] = [];
-  for (let m = 1; m <= 12; m++) {
-    const dateStr = lunarToSolarStr(pick.year, m, 15);
+  for (const cell of months) {
+    const dateStr = lunarToSolarStr(pick.year, cell.month, 15, cell.leap);
     if (!dateStr) continue;
     try {
       const h = astrolabe.horoscope(dateStr, 0);
       results.push({
-        month: m,
-        label: months[m - 1]?.label,
-        ganZhi: months[m - 1]?.gz,
+        month: cell.month,
+        isLeapMonth: cell.leap,
+        label: cell.label,
+        ganZhi: cell.gz,
         ...serializeHoroscopeItem(h.monthly),
       });
     } catch {
@@ -87,6 +88,11 @@ function getMonthlyOfYear(z: Zwds) {
     }
   }
   return results;
+}
+
+/** 当前拨盘所指的流月单元（含闰月判定） */
+function currentMonthCell(z: Zwds) {
+  return z.months.find((m) => m.month === z.pick.month && m.leap === z.effLeap);
 }
 
 function schoolLabel(algorithm: string): string {
@@ -111,6 +117,12 @@ export function buildExportData(z: Zwds) {
         : z.input.astroType === "earth"
           ? "地盘（身宫起局重排）"
           : "人盘（福德宫起局重排）",
+    mutagenTable: MUTAGEN_TABLE_LABEL[z.input.mutagenTable],
+    /** 实际生效的十干四化全表（禄/权/科/忌），生年与运限四化均依此 */
+    mutagenTableDetail: Object.fromEntries(
+      STEMS.map((s) => [s, util.getMutagensByHeavenlyStem(s as never) as string[]])
+    ),
+    dayDivide: z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日",
     exportedAt: new Date().toISOString(),
     note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。",
   };
@@ -415,7 +427,9 @@ export function buildExportMd(z: Zwds): string | null {
       : "";
   L.push(`> 排盘引擎：iztro · 安星流派：**${schoolLabel(z.input.algorithm)}** · 年/运限分界：${
     z.input.yearDivide === "exact" ? "立春" : "正月初一"
-  }${astroTypeLabel} · 导出时间：${new Date().toLocaleString("zh-CN")}`);
+  }${astroTypeLabel} · 四化表：**${MUTAGEN_TABLE_LABEL[z.input.mutagenTable]}**（全表见附录B） · ${
+    z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日"
+  } · 导出时间：${new Date().toLocaleString("zh-CN")}`);
   L.push(`> 星名后括号为亮度（庙旺得利平不陷），【生年X】为生年四化；各运限四化在对应章节单列。`);
   L.push("");
 
@@ -496,8 +510,8 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(
       `- 当前序列：${
         dec ? `大限 ${dec.range[0]}~${dec.range[1]}（${dec.heavenlyStem}${dec.earthlyBranch}）` : "童限"
-      } → 流年 ${z.pick.year} → 流月 ${z.months[z.pick.month - 1]?.label ?? z.pick.month}（${
-        z.months[z.pick.month - 1]?.gz ?? ""
+      } → 流年 ${z.pick.year} → 流月 ${currentMonthCell(z)?.label ?? z.pick.month}（${
+        currentMonthCell(z)?.gz ?? ""
       }） → 流日 ${z.days[z.clampedDay - 1]?.label ?? z.clampedDay}（${
         z.days[z.clampedDay - 1]?.gz ?? ""
       }） → 流时 ${z.hours[z.pick.hour]?.label ?? ""}（${z.hours[z.pick.hour]?.gz ?? ""}）`
@@ -521,7 +535,7 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(`- 流年岁前十二神：${h.yearly.yearlyDecStar.suiqian12.join("、")}（按宫位索引 0~11 排列，0=寅宫）`);
     L.push(`- 流年将前十二神：${h.yearly.yearlyDecStar.jiangqian12.join("、")}（同上）`);
     L.push("");
-    L.push(scopeSection(a, "monthly", h.monthly, `（${z.months[z.pick.month - 1]?.label ?? ""}）`));
+    L.push(scopeSection(a, "monthly", h.monthly, `（${currentMonthCell(z)?.label ?? ""}）`));
     L.push(scopeSection(a, "daily", h.daily, `（${z.days[z.clampedDay - 1]?.label ?? ""}）`));
     L.push(scopeSection(a, "hourly", h.hourly, `（${z.hours[z.pick.hour]?.label ?? ""}）`));
   }
@@ -642,6 +656,19 @@ export function buildExportMd(z: Zwds): string | null {
 
   /* 附录A：推理规则速查（L1 知识层） */
   L.push(RULEBOOK_MD);
+
+  /* 附录B：本盘实际生效的十干四化表 */
+  L.push(`## 附录B：本盘所用十干四化表（${MUTAGEN_TABLE_LABEL[z.input.mutagenTable]}）`);
+  L.push("");
+  L.push(`| 天干 | 化禄 | 化权 | 化科 | 化忌 |`);
+  L.push(`|---|---|---|---|---|`);
+  for (const s of STEMS) {
+    const t = util.getMutagensByHeavenlyStem(s as never) as string[];
+    L.push(`| ${s} | ${t[0]} | ${t[1]} | ${t[2]} | ${t[3]} |`);
+  }
+  L.push("");
+  L.push(`> 本文件所有生年四化、运限四化、飞宫四化、自化均依上表推算，AI 分析时请以此表为准。`);
+  L.push("");
 
   return L.join("\n");
 }

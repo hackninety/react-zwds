@@ -73,7 +73,7 @@ function Cell({
 }
 
 export function HoroscopeBar({ z }: { z: Zwds }) {
-  const { decades, childhood, activeDecadeIdx, years, months, days, hours, pick, clampedDay, visible, actions } = z;
+  const { decades, childhood, activeDecadeIdx, years, months, days, hours, pick, clampedDay, effLeap, visible, actions } = z;
 
   return (
     <section className="hbar">
@@ -131,16 +131,17 @@ export function HoroscopeBar({ z }: { z: Zwds }) {
         scope="monthly"
         on={visible.monthly}
         onToggle={() => actions.toggleScope("monthly")}
-        activeKey={pick.month}
+        activeKey={`${pick.month}${effLeap ? "L" : ""}`}
       >
         {months.map((m) => (
           <Cell
-            key={m.month}
+            key={`${m.month}${m.leap ? "L" : ""}`}
             main={m.label}
             sub={m.gz}
             scope="monthly"
-            active={pick.month === m.month}
-            onClick={() => actions.pickMonth(m.month)}
+            active={pick.month === m.month && effLeap === m.leap}
+            onClick={() => actions.pickMonth(m.month, m.leap)}
+            title={m.leap ? "闰月无独立月建，干支沿用本月；运限按实际日期推算" : undefined}
           />
         ))}
       </Row>

@@ -31,6 +31,8 @@ const DEFAULT_INPUT: BirthInput = {
   district: "市区",
   algorithm: "default",
   yearDivide: "normal",
+  mutagenTable: "default",
+  dayDivide: "forward",
   astroType: "heaven",
   residence: "",
 };

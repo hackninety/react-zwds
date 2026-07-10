@@ -96,6 +96,52 @@ export const SCHOOL_YEAR_DIVIDE = {
   zhongzhou: "exact",
 } as const satisfies Record<string, "normal" | "exact">;
 
+/**
+ * 十干四化表预设（顺序：禄/权/科/忌）。
+ * - 通行：《紫微斗数全书》体系，与 iztro 内置默认一致（戊贪阴右机·庚阳武阴同·壬梁紫左武）
+ * - 中州：王亭之主张，庚/壬两干以天府化科（庚阳武府同·壬梁紫府武），其余同通行
+ * 始终整表注入 iztro（config.mutagens 为全局粘性配置，整表覆盖以避免切换残留）。
+ */
+export const MUTAGEN_TABLES: Record<"default" | "zhongzhou", Record<string, string[]>> = {
+  default: {
+    甲: ["廉贞", "破军", "武曲", "太阳"],
+    乙: ["天机", "天梁", "紫微", "太阴"],
+    丙: ["天同", "天机", "文昌", "廉贞"],
+    丁: ["太阴", "天同", "天机", "巨门"],
+    戊: ["贪狼", "太阴", "右弼", "天机"],
+    己: ["武曲", "贪狼", "天梁", "文曲"],
+    庚: ["太阳", "武曲", "太阴", "天同"],
+    辛: ["巨门", "太阳", "文曲", "文昌"],
+    壬: ["天梁", "紫微", "左辅", "武曲"],
+    癸: ["破军", "巨门", "太阴", "贪狼"],
+  },
+  zhongzhou: {
+    甲: ["廉贞", "破军", "武曲", "太阳"],
+    乙: ["天机", "天梁", "紫微", "太阴"],
+    丙: ["天同", "天机", "文昌", "廉贞"],
+    丁: ["太阴", "天同", "天机", "巨门"],
+    戊: ["贪狼", "太阴", "右弼", "天机"],
+    己: ["武曲", "贪狼", "天梁", "文曲"],
+    庚: ["太阳", "武曲", "天府", "天同"],
+    辛: ["巨门", "太阳", "文曲", "文昌"],
+    壬: ["天梁", "紫微", "天府", "武曲"],
+    癸: ["破军", "巨门", "太阴", "贪狼"],
+  },
+};
+
+export type MutagenTableKey = keyof typeof MUTAGEN_TABLES;
+
+export const MUTAGEN_TABLE_LABEL: Record<MutagenTableKey, string> = {
+  default: "通行四化（庚阳武阴同·壬梁紫左武）",
+  zhongzhou: "中州派四化（庚阳武府同·壬梁紫府武，天府化科）",
+};
+
+/** 各流派默认四化表（切流派时自动配对，可手动覆盖） */
+export const SCHOOL_MUTAGEN_TABLE = {
+  default: "default",
+  zhongzhou: "zhongzhou",
+} as const satisfies Record<string, MutagenTableKey>;
+
 /** 阳干判断（甲丙戊庚壬） */
 export function isYangStem(stem: string): boolean {
   const i = STEMS.indexOf(stem as (typeof STEMS)[number]);
