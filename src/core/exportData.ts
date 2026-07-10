@@ -7,6 +7,7 @@ import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
 import { MUTAGEN_CHARS, SCOPE_META, fixIndex, type Scope } from "./utils";
 import { lunarToSolarStr } from "./lunar";
 import { analyzeChart, type ChartAnalysis } from "./analysis";
+import { RULEBOOK_MD } from "./knowledge";
 
 /** 本宫自化（离心）：宫干四化命中本宫主星/辅星 */
 function getSelfMutagens(p: Astrolabe["palaces"][number]) {
@@ -192,6 +193,8 @@ export function buildExportData(z: Zwds) {
     analysis: analyzeChart(a),
     horoscope,
     lifeKline: serializeLifeKline(z),
+    /** L1 知识层：推理规则速查（Markdown 文本，供 AI 直接遵循） */
+    rulebook: RULEBOOK_MD,
   };
 }
 
@@ -622,7 +625,7 @@ export function buildExportMd(z: Zwds): string | null {
   L.push(
     `> 4. 每个论断须注明依据（引用具体宫位/星耀/四化/格局），并区分「结构必然 / 大概率 / 倾向参考」三档确定度；`
   );
-  L.push(`> 5. 流派口径以本文件 meta 标注为准，不得改星、改宫、改四化。`);
+  L.push(`> 5. 推理框架遵循附录A《规则速查》（推理次序/四化层级/自化/叠宫/论断分寸），流派口径以本文件 meta 标注为准，不得改星、改宫、改四化。`);
   if (z.input.residence) {
     L.push(
       `> 6. 命主常居住地为「${z.input.residence}」（不参与排盘），涉及迁移宫、方位喜忌、异地发展等议题时结合参考。`
@@ -636,6 +639,9 @@ export function buildExportMd(z: Zwds): string | null {
   L.push(`- 感情婚姻的走势与要点？——夫妻宫三方四正快照 + 夫妻宫飞宫四化 + 大限夫妻宫叠宫`);
   L.push(`- 近十年何时适合创业/置业/转型？——十二大限总览（第七节）+ K线高光年 + 官禄/田宅域曲线`);
   L.push("");
+
+  /* 附录A：推理规则速查（L1 知识层） */
+  L.push(RULEBOOK_MD);
 
   return L.join("\n");
 }
