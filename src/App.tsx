@@ -5,7 +5,7 @@ import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
 import { LifeKline } from "./components/LifeKline";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { buildExportMd, downloadJson, downloadMd } from "./core/exportData";
+import { buildExportMd, downloadJson, downloadMd, downloadToon } from "./core/exportData";
 
 const STORAGE_KEY = "zwds-input-v2";
 
@@ -103,8 +103,16 @@ export default function App() {
           <button
             type="button"
             disabled={!z.astrolabe}
+            onClick={() => downloadToon(z)}
+            title="导出 TOON 格式（面向 LLM 的紧凑表格化编码，与 JSON 同数据、token 大幅缩减），适合直接喂给 AI"
+          >
+            导出 TOON
+          </button>
+          <button
+            type="button"
+            disabled={!z.astrolabe}
             onClick={() => downloadJson(z)}
-            title="导出完整命盘+运限数据（JSON），可上传给 AI 分析"
+            title="导出完整命盘+运限数据（JSON），供程序处理或 AI 分析"
           >
             导出 JSON
           </button>

@@ -24,8 +24,10 @@
  *   收敛 [8,92]；K 线 open=上年 close,high/low 由进/出两股动能撑开。
  */
 import { util } from "iztro";
+import { getHoroscopeStar } from "iztro/lib/star/horoscopeStar";
 import type { Astrolabe, DecadeInfo } from "./useZwds";
-import { BRANCHES, MUTAGEN_CHARS, fixIndex, yearGanZhi } from "./utils";
+import { BRANCHES, LUNAR_MONTHS, MUTAGEN_CHARS, fixIndex, monthGanZhi, yearGanZhi } from "./utils";
+import { leapMonthOf } from "./lunar";
 
 const CHONG: Record<string, string> = {
   子: "午", 午: "子", 丑: "未", 未: "丑", 寅: "申", 申: "寅",
@@ -46,20 +48,50 @@ const BAD_STARS: Record<string, number> = {
 const MUT_YEARLY = [8, 5, 4, -8];
 const MUT_DECADAL = [6, 4, 3, -6];
 const MUT_NATAL_BASE = [3, 2, 2, -4];
+const MUT_MONTHLY = [5, 3, 2, -5];
 /** 忌的落位权重：忌坐对宫=冲本宫，冲比坐烈（0.9），高于常规对宫权 0.6 */
 const JI_WEIGHTS: [number, number, number] = [1.0, 0.9, 0.4]; // [本宫, 对宫(冲), 三合]
 /** 双忌（大限忌+流年忌同引本域）叠加加重系数 */
 const DOUBLE_JI_FACTOR = 0.35;
 
-/** 流年禄存所在地支（年干 → 支）：甲寅乙卯丙戊巳丁己午庚申辛酉壬亥癸子 */
-const LU_BRANCH: Record<string, string> = {
-  甲: "寅", 乙: "卯", 丙: "巳", 丁: "午", 戊: "巳", 己: "午", 庚: "申", 辛: "酉", 壬: "亥", 癸: "子",
+/**
+ * 流曜/月曜权重（iztro getHoroscopeStar 同源公式起盘，随干支）：正=进，负=出。
+ * 流鸾流喜在夫妻/子女域加倍（婚恋应期标记）。
+ */
+const FLOW_STAR_SCORE: Record<string, number> = {
+  流禄: 2, 流马: 1.5, 流昌: 1, 流曲: 1, 流魁: 1, 流钺: 1,
+  流羊: -2, 流陀: -2, 流鸾: 0.8, 流喜: 0.8,
+  月禄: 1.2, 月马: 0.8, 月昌: 0.6, 月曲: 0.6, 月魁: 0.6, 月钺: 0.6,
+  月羊: -1.2, 月陀: -1.2, 月鸾: 0.5, 月喜: 0.5,
 };
-/** 流年天马所在地支（年支三合局 → 马）：申子辰在寅、寅午戌在申、巳酉丑在亥、亥卯未在巳 */
-const MA_BRANCH: Record<string, string> = {
-  申: "寅", 子: "寅", 辰: "寅", 寅: "申", 午: "申", 戌: "申",
-  巳: "亥", 酉: "亥", 丑: "亥", 亥: "巳", 卯: "巳", 未: "巳",
-};
+/** 鸾喜的婚恋域（加倍生效） */
+const LOVE_DOMAINS = new Set(["夫妻", "子女"]);
+const LUAN_XI = new Set(["流鸾", "流喜", "月鸾", "月喜"]);
+
+type FlowStarHit = { idx: number; name: string; v: number };
+const flowCache = new Map<string, FlowStarHit[]>();
+
+/** 某干支的流曜/月曜落宫（带基础分值），60 甲子内缓存 */
+function flowStarsOf(scope: "yearly" | "monthly", stem: string, branch: string): FlowStarHit[] {
+  const key = `${scope}:${stem}${branch}`;
+  const c = flowCache.get(key);
+  if (c) return c;
+  const hits: FlowStarHit[] = [];
+  try {
+    const groups = getHoroscopeStar(stem as never, branch as never, scope);
+    groups.forEach((g, idx) => {
+      for (const s of g) {
+        const name = s.name as string;
+        const v = FLOW_STAR_SCORE[name];
+        if (v) hits.push({ idx, name, v });
+      }
+    });
+  } catch {
+    /* 干支异常时无流曜 */
+  }
+  flowCache.set(key, hits);
+  return hits;
+}
 /** 小限起宫地支（生年支三合局）：寅午戌人辰上起、申子辰人戌上起、巳酉丑人未上起、亥卯未人丑上起 */
 const AGE_START_BRANCH: Record<string, string> = {
   寅: "辰", 午: "辰", 戌: "辰", 申: "戌", 子: "戌", 辰: "戌",
@@ -333,43 +365,40 @@ export function buildLifeKline(
         factors.push("流年支合本宫 +2");
       }
 
-      // 流曜：流禄/流羊/流陀（随年干）、流马（随年支）落三方四正
-      const luIdx = branchPalaceIdx(LU_BRANCH[yStem] ?? "");
-      const maIdx = branchPalaceIdx(MA_BRANCH[yBranch] ?? "");
-      const wLu = wmap.get(luIdx);
-      if (wLu) {
-        gain += wLu * 2;
-        factors.push(`流禄入${a.palaces[luIdx].name} ${fmt(wLu * 2)}`);
+      // 流曜（魁钺昌曲禄羊陀马鸾喜十颗，iztro 同源公式；鸾喜在夫妻/子女域加倍）
+      const flows = flowStarsOf("yearly", yStem, yBranch);
+      const liuLuIdx = flows.find((f) => f.name === "流禄")?.idx ?? -1;
+      const liuMaIdx = flows.find((f) => f.name === "流马")?.idx ?? -1;
+      for (const f of flows) {
+        if (f.name === "流马") continue; // 流马按禄马交驰逻辑单独处理
+        const w = wmap.get(f.idx);
+        if (!w) continue;
+        let v = f.v * w;
+        if (LUAN_XI.has(f.name) && LOVE_DOMAINS.has(palace.name)) v *= 2;
+        if (v >= 0) gain += v;
+        else drain += -v;
+        if (Math.abs(v) >= 0.5)
+          factors.push(`${f.name}入${a.palaces[f.idx].name} ${v >= 0 ? fmt(v) : `-${round(-v)}`}`);
       }
-      const yangIdx = fixIndex(luIdx + 1);
-      const tuoIdx = fixIndex(luIdx - 1);
-      const wYang = wmap.get(yangIdx);
-      if (wYang) {
-        drain += wYang * 2;
-        factors.push(`流羊入${a.palaces[yangIdx].name} -${round(wYang * 2)}`);
-      }
-      const wTuo = wmap.get(tuoIdx);
-      if (wTuo) {
-        drain += wTuo * 2;
-        factors.push(`流陀入${a.palaces[tuoIdx].name} -${round(wTuo * 2)}`);
-      }
-      const wMa = wmap.get(maIdx);
+      const wMa = liuMaIdx >= 0 ? wmap.get(liuMaIdx) : undefined;
       if (wMa) {
         // 禄马交驰年：流马与流禄同宫，或流马之宫坐本命禄存/生年禄星
         const maMates = new Set(
-          [...a.palaces[maIdx].majorStars, ...a.palaces[maIdx].minorStars].map(
+          [...a.palaces[liuMaIdx].majorStars, ...a.palaces[liuMaIdx].minorStars].map(
             (s) => s.name as string
           )
         );
         const natalLuStar = mutHits(natalYearStem).find((h) => h.k === 0)?.star;
         const withLu =
-          maIdx === luIdx || maMates.has("禄存") || (natalLuStar ? maMates.has(natalLuStar) : false);
+          liuMaIdx === liuLuIdx ||
+          maMates.has("禄存") ||
+          (natalLuStar ? maMates.has(natalLuStar) : false);
         if (withLu) {
           gain += 3;
-          factors.push(`禄马交驰（流马会禄于${a.palaces[maIdx].name}） +3`);
+          factors.push(`禄马交驰（流马会禄于${a.palaces[liuMaIdx].name}） +3`);
         } else {
           gain += wMa * 1.5;
-          factors.push(`流马入${a.palaces[maIdx].name} ${fmt(wMa * 1.5)}`);
+          factors.push(`流马入${a.palaces[liuMaIdx].name} ${fmt(wMa * 1.5)}`);
         }
       }
 
@@ -482,9 +511,180 @@ export function buildLifeKline(
   );
 
   return {
-    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科·流禄·流马·六合)」与「出(忌·冲·流羊陀·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。忌落对宫按「冲本宫」加重；大限忌+流年忌同引为双忌叠加非线性放大；流禄会流马为禄马交驰；流禄落生年忌宫为禄忌交缠变动年。确定性推演,仅供参考娱乐。",
+    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科·流曜吉·六合)」与「出(忌·冲·流羊陀·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。流曜十颗（魁钺昌曲禄羊陀马鸾喜，iztro 同源公式），鸾喜在夫妻/子女域加倍；忌落对宫按「冲本宫」加重；大限忌+流年忌同引为双忌叠加非线性放大；流禄会流马为禄马交驰；流禄落生年忌宫为禄忌交缠变动年。确定性推演,仅供参考娱乐。",
     domains,
     bands,
     lastAge,
+  };
+}
+
+/* ─────────────── 月K线（某域某年逐月细化） ─────────────── */
+
+export type KlineMonth = {
+  month: number;
+  leap: boolean;
+  label: string;
+  gz: string;
+  open: number;
+  close: number;
+  high: number;
+  low: number;
+  score: number;
+  delta: number;
+  gain: number;
+  drain: number;
+  net: number;
+  magnitude: number;
+  pattern: string;
+  factors: string[];
+};
+
+export type MonthlyKline = {
+  year: number;
+  ganZhi: string;
+  palaceIndex: number;
+  palaceName: string;
+  months: KlineMonth[];
+  note: string;
+};
+
+/**
+ * 月K线：以该年年K的 open→close 轨迹为基准漂移，
+ * 月干四化（五虎遁）引动三方四正 + 月支冲合本宫 + 月曜（月魁钺昌曲禄羊陀马鸾喜）
+ * 制造波动；闰月沿用本月干支（无独立月建）。anchor 传该域该年的年K open/close。
+ */
+export function buildMonthlyKline(
+  a: Astrolabe,
+  palaceIndex: number,
+  year: number,
+  anchor: { open: number; close: number }
+): MonthlyKline | null {
+  const palace = a.palaces[palaceIndex];
+  if (!palace) return null;
+  const P = palaceIndex;
+  const wmap = tsWeights(P);
+  const pBranch = palace.earthlyBranch as string;
+
+  const starPalace = new Map<string, number>();
+  for (const p of a.palaces) {
+    for (const st of [...p.majorStars, ...p.minorStars]) starPalace.set(st.name as string, p.index);
+  }
+  const mutHits = (stem: string) => {
+    if (!stem) return [] as { idx: number; k: number; star: string }[];
+    const stars = util.getMutagensByHeavenlyStem(stem as never) as string[];
+    const hits: { idx: number; k: number; star: string }[] = [];
+    stars.forEach((star, k) => {
+      const idx = starPalace.get(star);
+      if (idx != null) hits.push({ idx, k, star });
+    });
+    return hits;
+  };
+
+  /* 月序（含闰月位，闰月沿用本月干支） */
+  const leapM = leapMonthOf(year);
+  const list: { month: number; leap: boolean; label: string; gz: string }[] = [];
+  for (let m = 1; m <= 12; m++) {
+    list.push({ month: m, leap: false, label: LUNAR_MONTHS[m - 1], gz: monthGanZhi(year, m) });
+    if (leapM === m) {
+      list.push({ month: m, leap: true, label: `闰${LUNAR_MONTHS[m - 1]}`, gz: monthGanZhi(year, m) });
+    }
+  }
+
+  const months: KlineMonth[] = [];
+  const M = list.length;
+  list.forEach((cell, i) => {
+    const mStem = cell.gz.charAt(0);
+    const mBranch = BRANCHES[fixIndex(cell.month + 1)]; // 正月建寅
+    const factors: string[] = [];
+    let gain = 0;
+    let drain = 0;
+
+    // 月干四化落三方四正（忌按落位专用权重）
+    for (const hit of mutHits(mStem)) {
+      const w = wmap.get(hit.idx);
+      if (!w) continue;
+      if (hit.k === 3) {
+        const pos = hit.idx === P ? 0 : hit.idx === fixIndex(P + 6) ? 1 : 2;
+        const v = JI_WEIGHTS[pos] * Math.abs(MUT_MONTHLY[3]);
+        drain += v;
+        factors.push(
+          `月${hit.star}化忌→${a.palaces[hit.idx].name}${pos === 1 ? "(冲本宫)" : ""} -${round(v)}`
+        );
+      } else {
+        const v = w * MUT_MONTHLY[hit.k];
+        gain += v;
+        if (v >= 0.8)
+          factors.push(`月${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
+      }
+    }
+
+    // 月支冲合本宫
+    if (CHONG[mBranch] === pBranch) {
+      drain += 3;
+      factors.push("月支冲本宫 -3");
+    } else if (LIU_HE[mBranch] === pBranch) {
+      gain += 1.5;
+      factors.push("月支合本宫 +1.5");
+    }
+
+    // 月曜（魁钺昌曲禄羊陀马鸾喜，鸾喜在夫妻/子女域加倍）
+    for (const f of flowStarsOf("monthly", mStem, mBranch)) {
+      const w = wmap.get(f.idx);
+      if (!w) continue;
+      let v = f.v * w;
+      if (LUAN_XI.has(f.name) && LOVE_DOMAINS.has(palace.name)) v *= 2;
+      if (v >= 0) gain += v;
+      else drain += -v;
+      if (Math.abs(v) >= 0.5)
+        factors.push(`${f.name}入${a.palaces[f.idx].name} ${v >= 0 ? fmt(v) : `-${round(-v)}`}`);
+    }
+
+    if (cell.leap) factors.push("闰月沿用本月干支（无独立月建）");
+
+    const net = gain - drain;
+    const magnitude = gain + drain;
+    // 沿年K开盘→收盘轨迹漂移 + 月波动
+    const base = anchor.open + ((anchor.close - anchor.open) * (i + 1)) / M;
+    const close = clamp(round(base + net), 5, 95);
+
+    let pattern = "平稳";
+    if (magnitude < 2.5) pattern = "平";
+    else if (gain >= 3 && drain >= 3) pattern = "大进大出";
+    else if (net >= 3) pattern = "顺遂";
+    else if (net <= -3) pattern = "破耗";
+
+    months.push({
+      ...cell,
+      open: 0,
+      close,
+      high: 0,
+      low: 0,
+      score: close,
+      delta: 0,
+      gain: round(gain),
+      drain: round(drain),
+      net: round(net),
+      magnitude: round(magnitude),
+      pattern,
+      factors,
+    });
+  });
+
+  let prev = anchor.open;
+  for (const m of months) {
+    m.open = round(prev);
+    m.delta = m.close - m.open;
+    m.high = clamp(round(Math.max(m.open, m.close) + m.gain * 0.5), 2, 98);
+    m.low = clamp(round(Math.min(m.open, m.close) - m.drain * 0.5), 2, 98);
+    prev = m.close;
+  }
+
+  return {
+    year,
+    ganZhi: yearGanZhi(year),
+    palaceIndex: P,
+    palaceName: palace.name,
+    months,
+    note: "月K线：以该年年K开盘→收盘轨迹为基准漂移，月干四化（五虎遁）+ 月支冲合 + 月曜（魁钺昌曲禄羊陀马鸾喜）制造波动；闰月沿用本月干支。用于定应期月份，颗粒度细于年线、权重低于年线。",
   };
 }

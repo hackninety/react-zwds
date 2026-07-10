@@ -6,7 +6,9 @@ import { util } from "iztro";
 import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
 import { MUTAGEN_CHARS, MUTAGEN_TABLE_LABEL, SCOPE_META, STEMS, fixIndex, type Scope } from "./utils";
 import { lunarToSolarStr } from "./lunar";
+import { encode as toonEncode } from "@toon-format/toon";
 import { analyzeChart, type ChartAnalysis } from "./analysis";
+import { buildMonthlyKline } from "./lifeKline";
 import { RULEBOOK_MD, STAR_MUTAGEN_MD, topicGuidesMd } from "./knowledge";
 
 /** 本宫自化（离心）：宫干四化命中本宫主星/辅星 */
@@ -213,6 +215,36 @@ export function buildExportData(z: Zwds) {
   };
 }
 
+/** 选中年逐月细化（12 域；factors 仅命宫域附带以控制体积） */
+function serializeMonthly(z: Zwds) {
+  const lk = z.lifeKline;
+  const a = z.astrolabe;
+  if (!lk || !a) return null;
+  const rows = lk.domains
+    .map((d) => {
+      const y = d.years.find((x) => x.year === z.pick.year);
+      if (!y) return null;
+      const mk = buildMonthlyKline(a, d.palaceIndex, z.pick.year, { open: y.open, close: y.close });
+      if (!mk) return null;
+      return {
+        domain: d.label,
+        palaceName: d.palaceName,
+        months: mk.months.map((m) => ({
+          label: m.label,
+          gz: m.gz,
+          score: m.score,
+          delta: m.delta,
+          gain: m.gain,
+          drain: m.drain,
+          pattern: m.pattern,
+          ...(d.palaceName === "命宫" ? { factors: m.factors } : {}),
+        })),
+      };
+    })
+    .filter(Boolean);
+  return rows.length ? { year: z.pick.year, note: "月K线：月干四化+月支冲合+月曜引动，定应期月份；分值以该域该年年K轨迹为基准。", domains: rows } : null;
+}
+
 /** 人生K线导出：紧凑逐年序列 + 各域高光/低谷（带计分原因） */
 function serializeLifeKline(z: Zwds) {
   const lk = z.lifeKline;
@@ -262,6 +294,7 @@ function serializeLifeKline(z: Zwds) {
   });
   return {
     note: lk.note,
+    monthlyOfSelectedYear: serializeMonthly(z),
     legend: "score/净=净运势(涨跌)；gain/进=禄权科·流禄·流马·六合动能；drain/出=忌·冲·流羊陀·自化漏动能；pattern=顺遂/大进大出/破耗/平稳/平；drainNature=出项性质(主动自化漏/被动忌冲/纠缠忌入/双忌叠加/禄忌交缠)。忌落对宫按冲本宫加重；大限忌+流年忌同引=双忌叠加非线性放大。判断某年好坏须同时看 净 与 进出：大进大出=净或有限但动能大、得失起伏，非单纯好或坏。",
     domains,
   };
@@ -626,6 +659,37 @@ export function buildExportMd(z: Zwds): string | null {
       for (const f of cur.factors.length ? cur.factors : ["平年（三方四正无显著引动）"]) L.push(`  - ${f}`);
       L.push("");
     }
+
+    /* 命宫域选中年逐月细化（月K线） */
+    const curYearData = overall.years.find((y) => y.year === z.pick.year);
+    if (curYearData && a) {
+      const mk = buildMonthlyKline(a, overall.palaceIndex, z.pick.year, {
+        open: curYearData.open,
+        close: curYearData.close,
+      });
+      if (mk) {
+        L.push(`### 命宫域 ${z.pick.year} 年逐月细化（月K线）`);
+        L.push("");
+        L.push(`> ${mk.note}`);
+        L.push("");
+        L.push(`| 月 | 干支 | 分 | 较上月 | 进 | 出 | 形态 |`);
+        L.push(`|---|---|---|---|---|---|---|`);
+        for (const m of mk.months) {
+          L.push(
+            `| ${m.label} | ${m.gz} | ${m.score} | ${m.delta >= 0 ? "+" : ""}${m.delta} | ${m.gain} | ${m.drain} | ${m.pattern} |`
+          );
+        }
+        L.push("");
+        const curM = mk.months.find((m) => m.month === z.pick.month && m.leap === z.effLeap);
+        if (curM) {
+          L.push(`- 当前观测月【${curM.label}（${curM.gz}）】明细：`);
+          for (const f of curM.factors.length ? curM.factors : ["平月（无显著引动）"]) {
+            L.push(`  - ${f}`);
+          }
+          L.push("");
+        }
+      }
+    }
   }
 
   L.push(`## 十、AI 推理指引`);
@@ -704,6 +768,32 @@ export function downloadJson(z: Zwds) {
   const data = buildExportData(z);
   if (!data) return;
   download(`${baseFilename(z)}.json`, JSON.stringify(data, null, 2), "application/json;charset=utf-8");
+}
+
+/**
+ * TOON 导出（Token-Oriented Object Notation，https://github.com/toon-format/toon）：
+ * 与 JSON 同一数据、面向 LLM 的紧凑表格化编码（均匀数组转表头+行）。
+ * 长篇知识附录（规则速查/星情要诀/主题指引）为 Markdown 文本，剥离并注明见 MD 导出。
+ */
+export function buildExportToon(z: Zwds): string | null {
+  const data = buildExportData(z);
+  if (!data) return null;
+  const { rulebook, starEssentials, topicGuides, ...rest } = data;
+  void rulebook;
+  void starEssentials;
+  void topicGuides;
+  const meta = {
+    ...rest.meta,
+    format: "TOON v2（表格化数组：字段头+逐行值）",
+    note: `${rest.meta.note} 知识附录（推理规则速查/星情要诀/主题指引）未随 TOON 携带，见 Markdown 导出附录A/C/D。`,
+  };
+  return toonEncode({ ...rest, meta });
+}
+
+export function downloadToon(z: Zwds) {
+  const toon = buildExportToon(z);
+  if (!toon) return;
+  download(`${baseFilename(z)}.toon`, toon, "text/plain;charset=utf-8");
 }
 
 export function downloadMd(z: Zwds) {

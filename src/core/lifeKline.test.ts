@@ -1,7 +1,8 @@
 /** 人生K线评分引擎不变量测试（固定生辰，确定性推演） */
 import { describe, expect, it } from "vitest";
 import { astro } from "iztro";
-import { buildLifeKline } from "./lifeKline";
+import { buildLifeKline, buildMonthlyKline } from "./lifeKline";
+import { monthGanZhi } from "./utils";
 import type { Astrolabe, DecadeInfo } from "./useZwds";
 
 function makeChart(dateStr = "2000-08-16", timeIndex = 2, gender: "男" | "女" = "男"): Astrolabe {
@@ -74,10 +75,13 @@ describe("lifeKline 评分引擎", () => {
     expect(JSON.stringify(lk2.domains[0].years)).toBe(JSON.stringify(lk.domains[0].years));
   });
 
-  it("引动因子出现在 factors 中（全域至少各出现一次流禄/流羊或流陀）", () => {
+  it("引动因子出现在 factors 中（流曜十颗：禄羊陀之外应见昌曲魁钺鸾喜）", () => {
     const all = lk.domains.flatMap((d) => d.years.flatMap((y) => y.factors)).join("|");
     expect(all).toMatch(/流禄入/);
     expect(all).toMatch(/流[羊陀]入/);
+    expect(all).toMatch(/流[昌曲]入/);
+    expect(all).toMatch(/流[魁钺]入/);
+    expect(all).toMatch(/流[鸾喜]入/);
     expect(all).toMatch(/化忌→/);
   });
 
@@ -126,6 +130,45 @@ describe("lifeKline 评分引擎", () => {
     const all = lk.domains.flatMap((d) => d.years.flatMap((y) => y.factors)).join("|");
     expect(all).toMatch(/小限入本宫/);
     expect(all).toMatch(/小限冲本宫/);
+  });
+
+  it("月K线：非闰年 12 根、闰年 13 根（含闰月位），链续/边界/形态自洽", () => {
+    const soul = a.palaces.find((p) => p.name === "命宫")!;
+    const anchor = { open: 50, close: 56 };
+
+    const m2024 = buildMonthlyKline(a, soul.index, 2024, anchor)!;
+    expect(m2024.months).toHaveLength(12);
+
+    const m2025 = buildMonthlyKline(a, soul.index, 2025, anchor)!;
+    expect(m2025.months).toHaveLength(13);
+    const leapCell = m2025.months.find((m) => m.leap)!;
+    expect(leapCell.label).toBe("闰六月");
+    // 闰月沿用本月干支
+    expect(leapCell.gz).toBe(m2025.months.find((m) => m.month === 6 && !m.leap)!.gz);
+
+    for (const mk of [m2024, m2025]) {
+      expect(mk.months[0].open).toBe(anchor.open);
+      expect(mk.months[0].gz).toBe(monthGanZhi(mk.year, 1));
+      for (let i = 0; i < mk.months.length; i++) {
+        const m = mk.months[i];
+        if (i > 0) expect(m.open).toBe(mk.months[i - 1].close);
+        expect(m.score).toBeGreaterThanOrEqual(5);
+        expect(m.score).toBeLessThanOrEqual(95);
+        expect(m.gain).toBeGreaterThanOrEqual(0);
+        expect(m.drain).toBeGreaterThanOrEqual(0);
+        expect(m.high).toBeGreaterThanOrEqual(Math.max(m.open, m.close));
+        expect(m.low).toBeLessThanOrEqual(Math.min(m.open, m.close));
+        expect(["顺遂", "大进大出", "破耗", "平稳", "平"]).toContain(m.pattern);
+        expect(m.delta).toBe(m.close - m.open);
+      }
+      // 月干四化/月曜/冲合至少出现引动因子
+      const all = mk.months.flatMap((m) => m.factors).join("|");
+      expect(all).toMatch(/月.*化[禄权科忌]→|月支[冲合]本宫|月[禄羊陀昌曲魁钺马鸾喜]入/);
+    }
+
+    // 确定性
+    const again = buildMonthlyKline(a, soul.index, 2025, anchor)!;
+    expect(JSON.stringify(again)).toBe(JSON.stringify(m2025));
   });
 
   it("多组生辰跑通不抛错", () => {

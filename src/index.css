@@ -1504,3 +1504,41 @@ body {
 .pd-kind-注意 { color: var(--m-ke); border-color: rgba(251, 191, 36, 0.5); }
 
 .pd-jia { margin: 4px 0; color: var(--dim); }
+
+/* ── 人生K线·月线下钻 ── */
+.kline-mbtn {
+  margin-left: auto;
+  padding: 3px 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(243, 201, 107, 0.4);
+  background: transparent;
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-family: inherit;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.kline-mbtn:hover {
+  box-shadow: 0 0 10px rgba(243, 201, 107, 0.35);
+}
+
+.kline-mbtn.on {
+  background: var(--gold);
+  color: #1c1203;
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(243, 201, 107, 0.5);
+}
+
+.kline-month {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.kline-month-canvas {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+}
