@@ -172,13 +172,16 @@ export type TrueSolarResult = {
 };
 
 /**
- * 真太阳时校正：输入按东八区（120°E）钟表时间解释。
- * 真太阳时 = 钟表时间 + (经度 − 120) × 4 分钟 + 均时差
+ * 真太阳时校正。钟表时间按其所属时区基准解释：
+ * 真太阳时 = 钟表时间 + (经度×4 − 钟表基准偏移) 分钟 + 均时差
+ * clockOffsetMinutes 默认 480（东八区，基准 120°E，即传统 (经度−120)×4）；
+ * 海外出生传该时区出生时刻的实际 UTC 偏移（含夏令时）。
  */
 export function applyTrueSolar(
   solarDateStr: string,
   timeStr: string,
-  longitude: number
+  longitude: number,
+  clockOffsetMinutes = 480
 ): TrueSolarResult | null {
   const dm = solarDateStr.split(/[-/.]/).map(Number);
   const tm = timeStr.split(":").map(Number);
@@ -189,7 +192,7 @@ export function applyTrueSolar(
   const startOfYear = new Date(dm[0], 0, 1);
   const dayOfYear = Math.floor((base.getTime() - startOfYear.getTime()) / 86400000) + 1;
   const eot = equationOfTime(dayOfYear);
-  const offset = (longitude - 120) * 4 + eot;
+  const offset = longitude * 4 - clockOffsetMinutes + eot;
   const adj = new Date(base.getTime() + offset * 60000);
 
   const pad = (n: number) => String(n).padStart(2, "0");

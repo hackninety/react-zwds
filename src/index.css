@@ -234,6 +234,11 @@ body {
   font-size: 0.72rem;
 }
 
+/* 海外时区下拉：IANA 区名较长，限宽防撑破输入条 */
+.tz-select {
+  max-width: 240px;
+}
+
 .seg {
   display: inline-flex;
   border: 1px solid var(--line);

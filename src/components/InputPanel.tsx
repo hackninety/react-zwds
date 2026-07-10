@@ -12,8 +12,8 @@ import {
   ALL_PROVINCE_NAMES,
   getCityNamesOfProvince,
   getDistrictNamesOfCity,
-  getLongitude,
 } from "../core/cities";
+import { browserTimezone, formatOffset, listTimezones, resolveBirthPlace } from "../core/place";
 import type { BirthInput } from "../core/useZwds";
 
 /** 出生信息输入条：历法/日期/时辰/真太阳时（时刻+省市区）/流派 */
@@ -96,19 +96,34 @@ export function InputPanel({
     () => getDistrictNamesOfCity(draft.province, draft.city),
     [draft.province, draft.city]
   );
-  const longitude = useMemo(
-    () => getLongitude(draft.province, draft.city, draft.district),
-    [draft.province, draft.city, draft.district]
+  /** 全球 IANA 时区列表（海外出生用） */
+  const timezones = useMemo(listTimezones, []);
+
+  /** 出生公历日期（农历输入先转公历，与实际排盘一致） */
+  const solarStr = useMemo(
+    () =>
+      draft.calendar === "lunar" ? lunarStrToSolarStr(draft.date, draft.isLeapMonth) : draft.date,
+    [draft.calendar, draft.date, draft.isLeapMonth]
   );
 
-  /** 真太阳时下预览推定的时辰（农历输入先转公历再校正，与实际排盘一致） */
+  /** 出生地解析：经度 + 钟表基准偏移（海外含出生当日夏令时） */
+  const resolvedPlace = useMemo(() => {
+    if (!draft.useTrueSolar || !solarStr) return null;
+    return resolveBirthPlace(draft, solarStr, draft.exactTime || "12:00");
+  }, [draft, solarStr]);
+
+  /** 真太阳时下预览推定的时辰 */
   const derivedIdx = useMemo(() => {
-    if (!draft.useTrueSolar || !draft.exactTime) return null;
-    const solarStr =
-      draft.calendar === "lunar" ? lunarStrToSolarStr(draft.date, draft.isLeapMonth) : draft.date;
-    if (!solarStr) return null;
-    return applyTrueSolar(solarStr, draft.exactTime, longitude ?? 120)?.timeIndex ?? null;
-  }, [draft.useTrueSolar, draft.exactTime, draft.date, draft.calendar, draft.isLeapMonth, longitude]);
+    if (!draft.useTrueSolar || !draft.exactTime || !solarStr || !resolvedPlace) return null;
+    return (
+      applyTrueSolar(
+        solarStr,
+        draft.exactTime,
+        resolvedPlace.longitude,
+        resolvedPlace.clockOffsetMinutes
+      )?.timeIndex ?? null
+    );
+  }, [draft.useTrueSolar, draft.exactTime, solarStr, resolvedPlace]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -361,42 +376,92 @@ export function InputPanel({
             />
           </label>
 
-          <label className="fld">
-            <span>省份</span>
-            <select value={draft.province} onChange={(e) => setProvince(e.target.value)}>
-              {ALL_PROVINCE_NAMES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="seg" role="group" aria-label="出生地">
+            <button
+              type="button"
+              className={draft.placeMode !== "overseas" ? "on" : ""}
+              onClick={() => set("placeMode", "china")}
+              title="中国出生：省/市/区经度表，钟表按东八区（120°E 基准）解释"
+            >
+              中国
+            </button>
+            <button
+              type="button"
+              className={draft.placeMode === "overseas" ? "on" : ""}
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  placeMode: "overseas",
+                  timezone: d.timezone || browserTimezone(),
+                }))
+              }
+              title="海外出生：选 IANA 时区（默认取浏览器系统时区），经度取该区主城官方坐标，钟表偏移按出生日期实算（自动含历史夏令时）"
+            >
+              海外
+            </button>
+          </div>
 
-          <label className="fld">
-            <span>城市</span>
-            <select value={draft.city} onChange={(e) => setCity(e.target.value)}>
-              {cityNames.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+          {draft.placeMode === "overseas" ? (
+            <label className="fld">
+              <span>时区</span>
+              <select
+                className="tz-select"
+                value={draft.timezone || browserTimezone()}
+                onChange={(e) => set("timezone", e.target.value)}
+                title="IANA 时区（区名即主城，如 Asia/Tokyo=东京）；默认取当前浏览器系统时区"
+              >
+                {timezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <>
+              <label className="fld">
+                <span>省份</span>
+                <select value={draft.province} onChange={(e) => setProvince(e.target.value)}>
+                  {ALL_PROVINCE_NAMES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <label className="fld">
-            <span>区县</span>
-            <select value={draft.district} onChange={(e) => set("district", e.target.value)}>
-              {districtNames.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label className="fld">
+                <span>城市</span>
+                <select value={draft.city} onChange={(e) => setCity(e.target.value)}>
+                  {cityNames.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          {longitude != null && (
+              <label className="fld">
+                <span>区县</span>
+                <select value={draft.district} onChange={(e) => set("district", e.target.value)}>
+                  {districtNames.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+
+          {resolvedPlace && (
             <span className="ts-lng">
-              经度 {longitude}° · 经度偏移 {Math.round((longitude - 120) * 4)} 分（另含均时差）
+              经度 {resolvedPlace.longitude}° ·{" "}
+              {draft.placeMode === "overseas"
+                ? `钟表基准 ${formatOffset(resolvedPlace.clockOffsetMinutes)}（出生日实算，含夏令时）`
+                : "钟表基准东八区"}{" "}
+              · 经度偏移{" "}
+              {Math.round(resolvedPlace.longitude * 4 - resolvedPlace.clockOffsetMinutes)} 分（另含均时差）
             </span>
           )}
         </div>

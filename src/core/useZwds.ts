@@ -26,7 +26,7 @@ import {
   lunarToSolarStr,
   todayLunar,
 } from "./lunar";
-import { getLongitude } from "./cities";
+import { resolveBirthPlace } from "./place";
 import { buildLifeKline } from "./lifeKline";
 
 export type Astrolabe = ReturnType<typeof astro.bySolar>;
@@ -46,10 +46,14 @@ export type BirthInput = {
   exactTime: string;
   /** 按真太阳时排盘（勾选后展开时刻与出生地区） */
   useTrueSolar: boolean;
+  /** 出生地模式：中国城市（省市区经度表+东八区）/ 海外（IANA 时区） */
+  placeMode: "china" | "overseas";
   /** 出生地区（省/市/区三级，经度由此查表） */
   province: string;
   city: string;
   district: string;
+  /** 海外出生时区（IANA 名，如 Asia/Tokyo；默认取浏览器系统时区） */
+  timezone: string;
   /** 安星流派：通行版（南派）/ 中州派 */
   algorithm: "default" | "zhongzhou";
   /** 年分界：正月初一 / 立春（同时作用于运限分界）；随流派自动预设，可手动覆盖 */
@@ -73,7 +77,9 @@ export type TrueSolarInfo = {
   offsetMinutes: number;
   eotMinutes: number;
   longitude: number;
-  /** 出生地区（省市区） */
+  /** 钟表基准偏移（分钟）：中国=480（东八）；海外=出生时刻该时区实际 UTC 偏移（含夏令时） */
+  clockOffsetMinutes: number;
+  /** 出生地标签（省市区，或 IANA 时区+UTC 偏移） */
   place: string;
 };
 
@@ -127,8 +133,13 @@ export function useZwds(input: BirthInput) {
         ? lunarStrToSolarStr(input.date, input.isLeapMonth)
         : input.date;
     if (!solarStr) return base;
-    const longitude = getLongitude(input.province, input.city, input.district) ?? 120;
-    const adj = applyTrueSolar(solarStr, input.exactTime, longitude);
+    const resolved = resolveBirthPlace(input, solarStr, input.exactTime);
+    const adj = applyTrueSolar(
+      solarStr,
+      input.exactTime,
+      resolved.longitude,
+      resolved.clockOffsetMinutes
+    );
     if (!adj) return base;
     return {
       calendar: "solar" as const,
@@ -142,11 +153,9 @@ export function useZwds(input: BirthInput) {
         timeIndex: adj.timeIndex,
         offsetMinutes: adj.offsetMinutes,
         eotMinutes: adj.eotMinutes,
-        longitude,
-        place:
-          input.province === input.city
-            ? `${input.city}${input.district}`
-            : `${input.province}${input.city}${input.district}`,
+        longitude: resolved.longitude,
+        clockOffsetMinutes: resolved.clockOffsetMinutes,
+        place: resolved.place,
       },
     };
   }, [input]);
