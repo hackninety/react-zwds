@@ -238,6 +238,7 @@ function serializeLifeKline(z: Zwds) {
       earthlyBranch: d.branch,
       isBodyPalace: d.isBody,
       baseline: d.baseline,
+      baselineNotes: d.baselineNotes,
       sanfangsizheng: d.compose,
       decadeAvg: d.decadeAvg,
       // 逐年：score=净运势, net=进-出, gain=进, drain=出, pattern=形态
@@ -258,7 +259,7 @@ function serializeLifeKline(z: Zwds) {
   });
   return {
     note: lk.note,
-    legend: "score/净=净运势(涨跌)；gain/进=禄权科动能；drain/出=忌冲自化漏动能；pattern=顺遂/大进大出/破耗/平稳/平；drainNature=出项性质(主动自化漏/被动忌冲/纠缠忌入)。判断某年好坏须同时看 净 与 进出：大进大出=净或有限但动能大、得失起伏，非单纯好或坏。",
+    legend: "score/净=净运势(涨跌)；gain/进=禄权科·流禄·流马·六合动能；drain/出=忌·冲·流羊陀·自化漏动能；pattern=顺遂/大进大出/破耗/平稳/平；drainNature=出项性质(主动自化漏/被动忌冲/纠缠忌入/双忌叠加/禄忌交缠)。忌落对宫按冲本宫加重；大限忌+流年忌同引=双忌叠加非线性放大。判断某年好坏须同时看 净 与 进出：大进大出=净或有限但动能大、得失起伏，非单纯好或坏。",
     domains,
   };
 }
@@ -608,7 +609,7 @@ export function buildExportMd(z: Zwds): string | null {
     }
     L.push("");
     L.push(
-      `> 读法：**净=运势涨跌，进(禄权科)/出(忌冲自化漏)是两股动能**。故「大进大出」年（进出都大、净有限）不是简单的好或坏——如财帛该年赚得多也花/破得多，须看出项性质：主动(自化漏，多为自己花用/投资)、被动(忌冲，多为官非·罚款·外来破财)、纠缠(忌入，是非缠身)。命-财帛-官禄同一三合三角会同步；夫妻/迁移/福德、兄弟/疾厄/田宅、子女/交友/父母各自成组分化。身宫所在宫基调 +2 标「身」。`
+      `> 读法：**净=运势涨跌，进(禄权科·流禄·流马·六合)/出(忌·冲·流羊陀·自化漏)是两股动能**。故「大进大出」年（进出都大、净有限）不是简单的好或坏——如财帛该年赚得多也花/破得多，须看出项性质：主动(自化漏，多为自己花用/投资)、被动(忌冲，多为官非·罚款·外来破财)、纠缠(忌入，是非缠身)。忌落对宫按「冲本宫」加重；大限忌+流年忌同引=**双忌叠加**非线性放大；流马会禄=**禄马交驰**动中得财；流禄落生年忌宫=**禄忌交缠**变动年。命-财帛-官禄同一三合三角会同步；夫妻/迁移/福德、兄弟/疾厄/田宅、子女/交友/父母各自成组分化。身宫所在宫基调 +2 标「身」。`
     );
     L.push("");
     const overall = lk.domains.find((d) => d.palaceName === "命宫") ?? lk.domains[0];

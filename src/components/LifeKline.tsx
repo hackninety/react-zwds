@@ -109,6 +109,7 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
         {domain.palaceName}（{domain.branch}）· 三方四正 {domain.compose} · 基调{" "}
         {domain.baseline >= 0 ? "+" : ""}
         {domain.baseline}
+        {domain.baselineNotes.length > 0 && ` ｜ ${domain.baselineNotes.join("、")}`}
       </div>
 
       <div className="kline-scroll" ref={boxRef}>

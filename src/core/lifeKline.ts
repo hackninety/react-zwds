@@ -9,12 +9,18 @@
  *   固定基调 baseline(宫) = 三方四正星情（本宫×1.0 对宫×0.6 三合×0.4）
  *                          + 生年四化落三方四正（禄+3 权+2 科+2 忌-4,同权重）
  *                          + 身宫所在 +2
+ *                          + 离心自化泄气（忌-2 禄-1 权/科-0.5）
  *   逐年 = 50 + baseline
  *          + 大限四化落三方四正（禄+6 权+4 科+3 忌-6,按位权）
  *          + 流年四化落三方四正（禄+8 权+5 科+4 忌-8,按位权）
+ *          ※ 忌按专用落位权重：入本宫×1.0 / 落对宫=冲本宫×0.9（冲比坐烈）/ 三合×0.4
+ *          ※ 大限忌+流年忌同引本域 → 双忌叠加,追加 35% 非线性加重
  *          + 流年支冲本宫 -4 / 六合本宫 +2
+ *          + 流曜：流禄 +2w / 流羊·流陀 -2w / 流马 +1.5w（随年干支起,按位权 w）
+ *          ※ 流马会禄（流禄/本命禄存/生年禄星同宫）→ 禄马交驰 +3
+ *          ※ 流年化禄落生年忌宫 → 禄忌交缠·变动年 +2/-2（动能↑）
  *          + 命宫域岁限并临 -2
- *   收敛 [8,92]；K 线 open=上年 close,high/low 由动荡度（冲/忌/煞聚/并临）撑开。
+ *   收敛 [8,92]；K 线 open=上年 close,high/low 由进/出两股动能撑开。
  */
 import { util } from "iztro";
 import type { Astrolabe, DecadeInfo } from "./useZwds";
@@ -39,6 +45,22 @@ const BAD_STARS: Record<string, number> = {
 const MUT_YEARLY = [8, 5, 4, -8];
 const MUT_DECADAL = [6, 4, 3, -6];
 const MUT_NATAL_BASE = [3, 2, 2, -4];
+/** 忌的落位权重：忌坐对宫=冲本宫，冲比坐烈（0.9），高于常规对宫权 0.6 */
+const JI_WEIGHTS: [number, number, number] = [1.0, 0.9, 0.4]; // [本宫, 对宫(冲), 三合]
+/** 双忌（大限忌+流年忌同引本域）叠加加重系数 */
+const DOUBLE_JI_FACTOR = 0.35;
+
+/** 流年禄存所在地支（年干 → 支）：甲寅乙卯丙戊巳丁己午庚申辛酉壬亥癸子 */
+const LU_BRANCH: Record<string, string> = {
+  甲: "寅", 乙: "卯", 丙: "巳", 丁: "午", 戊: "巳", 己: "午", 庚: "申", 辛: "酉", 壬: "亥", 癸: "子",
+};
+/** 流年天马所在地支（年支三合局 → 马）：申子辰在寅、寅午戌在申、巳酉丑在亥、亥卯未在巳 */
+const MA_BRANCH: Record<string, string> = {
+  申: "寅", 子: "寅", 辰: "寅", 寅: "申", 午: "申", 戌: "申",
+  巳: "亥", 酉: "亥", 丑: "亥", 亥: "巳", 卯: "巳", 未: "巳",
+};
+/** 地支 → 宫位索引（palaces[0]=寅） */
+const branchPalaceIdx = (branch: string) => fixIndex(BRANCHES.indexOf(branch as never) - 2);
 
 /** 宫名 → 友好域名 + 展示优先级 */
 const DOMAIN_META: Record<string, { label: string; priority: number }> = {
@@ -94,6 +116,8 @@ export type KlineDomain = {
   branch: string;
   isBody: boolean;
   baseline: number;
+  /** 基调构成说明（自化泄气等结构性调整） */
+  baselineNotes: string[];
   /** 三方四正构成（本·对·三合宫名） */
   compose: string;
   years: KlineYear[];
@@ -198,7 +222,8 @@ export function buildLifeKline(
     const wmap = tsWeights(P);
     const composeNames = [...wmap.keys()].map((q) => a.palaces[q].name);
 
-    /* baseline（静态：三方四正星情 + 生年四化 + 身宫；自化忌者留不住，基调略降） */
+    /* baseline（静态：三方四正星情 + 生年四化 + 身宫 + 离心自化泄气） */
+    const baselineNotes: string[] = [];
     let baseline = 0;
     for (const [q, w] of wmap) baseline += w * palaceStarScore(a, q).s;
     for (const hit of mutHits(natalYearStem)) {
@@ -206,9 +231,29 @@ export function buildLifeKline(
       if (w) baseline += w * MUT_NATAL_BASE[hit.k];
     }
     if (palace.isBodyPalace) baseline += 2;
-    // 自化忌（本宫宫干化忌落本宫）：主动漏、得而复失的结构性倾向
-    const hasSelfJi = mutHits(palace.heavenlyStem).some((h) => h.k === 3 && h.idx === P);
-    if (hasSelfJi) baseline -= 2;
+    // 离心自化（本宫宫干四化本宫之星）：气外泄。忌最重=得而复失；禄权科小幅泄
+    const selfMutKinds = new Set(
+      mutHits(palace.heavenlyStem)
+        .filter((h) => h.idx === P)
+        .map((h) => h.k)
+    );
+    const hasSelfJi = selfMutKinds.has(3);
+    if (hasSelfJi) {
+      baseline -= 2;
+      baselineNotes.push("自化忌·得而复失 -2");
+    }
+    if (selfMutKinds.has(0)) {
+      baseline -= 1;
+      baselineNotes.push("自化禄·福不耐久 -1");
+    }
+    if (selfMutKinds.has(1)) {
+      baseline -= 0.5;
+      baselineNotes.push("自化权·虚张内耗 -0.5");
+    }
+    if (selfMutKinds.has(2)) {
+      baseline -= 0.5;
+      baselineNotes.push("自化科·虚名少实 -0.5");
+    }
     baseline = clamp(round(baseline), -18, 18);
 
     const years: KlineYear[] = [];
@@ -224,26 +269,44 @@ export function buildLifeKline(
       let drain = 0; // 出：忌·冲·并临·自化漏
       const nature: string[] = []; // 出项性质（主动/被动/纠缠）
 
-      // 四化落三方四正：禄权科=进；忌=出，按落位区分性质（入本宫=纠缠 / 冲本宫=被动 / 三合=拖累）
+      // 四化落三方四正：禄权科=进；忌=出，按落位区分性质与专用权重
+      // （入本宫=纠缠×1.0 / 落对宫=冲本宫·被动×0.9，冲比坐烈 / 三合=拖累×0.4）
+      let jiSources = 0; // 命中本域的忌来源数（大限/流年）
+      let jiDrainSum = 0;
       const applyMut = (stem: string, MUT: number[], tag: string) => {
+        let jiHit = false;
         for (const hit of mutHits(stem)) {
           const w = wmap.get(hit.idx);
           if (!w) continue;
-          const v = w * MUT[hit.k];
           if (hit.k === 3) {
-            drain += Math.abs(v);
-            if (hit.idx === P) nature.push(`${tag}${hit.star}忌入本宫·纠缠`);
-            else if (hit.idx === fixIndex(P + 6)) nature.push(`${tag}${hit.star}忌冲本宫·被动`);
+            const pos = hit.idx === P ? 0 : hit.idx === fixIndex(P + 6) ? 1 : 2;
+            const v = JI_WEIGHTS[pos] * Math.abs(MUT[3]);
+            drain += v;
+            jiDrainSum += v;
+            jiHit = true;
+            if (pos === 0) nature.push(`${tag}${hit.star}忌入本宫·纠缠`);
+            else if (pos === 1) nature.push(`${tag}${hit.star}忌冲本宫·被动`);
             else nature.push(`${tag}${hit.star}忌拖累三合`);
+            factors.push(`${tag}${hit.star}化忌→${a.palaces[hit.idx].name}${pos === 1 ? "(冲本宫)" : ""} -${round(v)}`);
           } else {
+            const v = w * MUT[hit.k];
             gain += v;
+            if (Math.abs(v) >= 1)
+              factors.push(`${tag}${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
           }
-          if (Math.abs(v) >= 1)
-            factors.push(`${tag}${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
         }
+        if (jiHit) jiSources++;
       };
       if (decade) applyMut(decade.heavenlyStem, MUT_DECADAL, "大限");
       applyMut(yStem, MUT_YEARLY, "流年");
+
+      // 双忌叠加：大限忌+流年忌同引本域，凶性非线性放大
+      if (jiSources >= 2) {
+        const extra = jiDrainSum * DOUBLE_JI_FACTOR;
+        drain += extra;
+        nature.push("双忌叠加·加重");
+        factors.push(`双忌叠加（大限忌+流年忌同引本域） -${round(extra)}`);
+      }
 
       // 流年支与本宫：六合=进，六冲=出（被动）
       if (CHONG[yBranch] === pBranch) {
@@ -253,6 +316,56 @@ export function buildLifeKline(
       } else if (LIU_HE[yBranch] === pBranch) {
         gain += 2;
         factors.push("流年支合本宫 +2");
+      }
+
+      // 流曜：流禄/流羊/流陀（随年干）、流马（随年支）落三方四正
+      const luIdx = branchPalaceIdx(LU_BRANCH[yStem] ?? "");
+      const maIdx = branchPalaceIdx(MA_BRANCH[yBranch] ?? "");
+      const wLu = wmap.get(luIdx);
+      if (wLu) {
+        gain += wLu * 2;
+        factors.push(`流禄入${a.palaces[luIdx].name} ${fmt(wLu * 2)}`);
+      }
+      const yangIdx = fixIndex(luIdx + 1);
+      const tuoIdx = fixIndex(luIdx - 1);
+      const wYang = wmap.get(yangIdx);
+      if (wYang) {
+        drain += wYang * 2;
+        factors.push(`流羊入${a.palaces[yangIdx].name} -${round(wYang * 2)}`);
+      }
+      const wTuo = wmap.get(tuoIdx);
+      if (wTuo) {
+        drain += wTuo * 2;
+        factors.push(`流陀入${a.palaces[tuoIdx].name} -${round(wTuo * 2)}`);
+      }
+      const wMa = wmap.get(maIdx);
+      if (wMa) {
+        // 禄马交驰年：流马与流禄同宫，或流马之宫坐本命禄存/生年禄星
+        const maMates = new Set(
+          [...a.palaces[maIdx].majorStars, ...a.palaces[maIdx].minorStars].map(
+            (s) => s.name as string
+          )
+        );
+        const natalLuStar = mutHits(natalYearStem).find((h) => h.k === 0)?.star;
+        const withLu =
+          maIdx === luIdx || maMates.has("禄存") || (natalLuStar ? maMates.has(natalLuStar) : false);
+        if (withLu) {
+          gain += 3;
+          factors.push(`禄马交驰（流马会禄于${a.palaces[maIdx].name}） +3`);
+        } else {
+          gain += wMa * 1.5;
+          factors.push(`流马入${a.palaces[maIdx].name} ${fmt(wMa * 1.5)}`);
+        }
+      }
+
+      // 流禄引动生年忌：流年化禄星落生年忌之宫（含禄忌同星），禄忌交缠=变动之年
+      const yLuHit = mutHits(yStem).find((h) => h.k === 0);
+      const natalJiHit = mutHits(natalYearStem).find((h) => h.k === 3);
+      if (yLuHit && natalJiHit && yLuHit.idx === natalJiHit.idx && wmap.has(yLuHit.idx)) {
+        gain += 2;
+        drain += 2;
+        nature.push("流禄引动生年忌·变动");
+        factors.push("流禄引动生年忌（禄忌交缠，先得后失防反复） +2/-2");
       }
 
       // 岁限并临（命宫域）：动荡
@@ -330,6 +443,7 @@ export function buildLifeKline(
       branch: palace.earthlyBranch as string,
       isBody: palace.isBodyPalace,
       baseline,
+      baselineNotes,
       compose: composeNames.join("·"),
       years,
       decadeAvg,
@@ -342,7 +456,7 @@ export function buildLifeKline(
   );
 
   return {
-    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科)」与「出(忌·冲·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。确定性推演,仅供参考娱乐。",
+    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科·流禄·流马·六合)」与「出(忌·冲·流羊陀·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。忌落对宫按「冲本宫」加重；大限忌+流年忌同引为双忌叠加非线性放大；流禄会流马为禄马交驰；流禄落生年忌宫为禄忌交缠变动年。确定性推演,仅供参考娱乐。",
     domains,
     bands,
     lastAge,
