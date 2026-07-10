@@ -69,7 +69,9 @@ src/
     place.ts       # 出生地解析：中国城市经度 / IANA 时区偏移（含夏令时）
     tzdata.ts      # tzdb zone1970.tab 生成的时区主城经度表（312 区）
     useZwds.ts     # 排盘主 Hook：拨盘状态 → 目标日期 → horoscope
-    analysis.ts    # 结构分析层：格局检测/飞宫矩阵/三方四正快照/夹宫/借星
+    chartIndex.ts  # 盘面索引原语（星→宫/三方四正/星文本，整盘建一次共享）
+    analysis.ts    # 结构分析层门面：飞宫矩阵/三方四正快照/夹宫/借星 + 聚合再导出
+    patterns.ts    # 格局检测层：本命格局 ~45 个 + 运限格局扫描八类
     decadePlan.ts  # 十年规划表（叠宫/四化/均值/高光低谷/运限格局）
     knowledge.ts   # L1 知识层：推理规则速查（随导出附给 AI）
     lifeKline.ts   # 人生K线评分引擎（进出双动能+流曜引动）

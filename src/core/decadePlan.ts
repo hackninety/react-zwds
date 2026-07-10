@@ -7,7 +7,8 @@
 import { util } from "iztro";
 import type { Astrolabe, DecadeInfo } from "./useZwds";
 import type { LifeKlineData } from "./lifeKline";
-import { detectHoroscopePatterns, type HoroPattern } from "./analysis";
+import { buildChartIndex } from "./chartIndex";
+import { detectHoroscopePatterns, type HoroPattern } from "./patterns";
 
 export type DecadeYearMark = { year: number; age: number; score: number };
 
@@ -37,6 +38,7 @@ export function buildDecadePlan(
   lk: LifeKlineData | null
 ): DecadePlanRow[] {
   const soulDomain = lk?.domains.find((d) => d.palaceName === "命宫") ?? null;
+  const ix = buildChartIndex(a); // 十二限共享一份索引
   return decades.map((d, idx) => {
     const seat = a.palaces[d.palaceIndex];
     const years =
@@ -57,7 +59,7 @@ export function buildDecadePlan(
       avg: avgEntry?.avg ?? (years.length ? Math.round(years.reduce((s, y) => s + y.score, 0) / years.length) : null),
       best: mark(sorted[0]),
       worst: mark(sorted[sorted.length - 1]),
-      patterns: detectHoroscopePatterns(a, "decadal", d.palaceIndex, d.heavenlyStem, d.earthlyBranch),
+      patterns: detectHoroscopePatterns(a, "decadal", d.palaceIndex, d.heavenlyStem, d.earthlyBranch, ix),
     };
   });
 }

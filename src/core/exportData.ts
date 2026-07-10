@@ -9,7 +9,7 @@ import { lunarToSolarStr } from "./lunar";
 import { encode as toonEncode } from "@toon-format/toon";
 import {
   analyzeChart,
-  detectHoroscopePatterns,
+  scanHoroscopePatterns,
   type ChartAnalysis,
   type HoroPattern,
 } from "./analysis";
@@ -109,27 +109,12 @@ function schoolLabel(algorithm: string): string {
     : "南派三合（《紫微斗数全书》通行版）";
 }
 
-/** 当前大限+流年的运限格局扫描（以运限命宫三方为中心） */
+/** 当前大限+流年的运限格局扫描（以运限命宫三方为中心，与盘面面板共用入口） */
 function horoscopePatternsOf(z: Zwds): { decadal: HoroPattern[]; yearly: HoroPattern[] } | null {
   const a = z.astrolabe;
   const h = z.horoscope;
   if (!a || !h) return null;
-  return {
-    decadal: detectHoroscopePatterns(
-      a,
-      "decadal",
-      h.decadal.index,
-      h.decadal.heavenlyStem as string,
-      h.decadal.earthlyBranch as string
-    ),
-    yearly: detectHoroscopePatterns(
-      a,
-      "yearly",
-      h.yearly.index,
-      h.yearly.heavenlyStem as string,
-      h.yearly.earthlyBranch as string
-    ),
-  };
+  return scanHoroscopePatterns(a, h);
 }
 
 export function buildExportData(z: Zwds) {

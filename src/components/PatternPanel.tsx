@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Zwds } from "../core/useZwds";
-import { detectHoroscopePatterns } from "../core/analysis";
+import { scanHoroscopePatterns } from "../core/analysis";
 
 /**
  * 格局·古籍语料面板（拨盘之下、人生K线之上）：
@@ -13,22 +13,7 @@ export function PatternPanel({ z }: { z: Zwds }) {
 
   const horoPats = useMemo(() => {
     if (!a || !h) return null;
-    return {
-      decadal: detectHoroscopePatterns(
-        a,
-        "decadal",
-        h.decadal.index,
-        h.decadal.heavenlyStem as string,
-        h.decadal.earthlyBranch as string
-      ),
-      yearly: detectHoroscopePatterns(
-        a,
-        "yearly",
-        h.yearly.index,
-        h.yearly.heavenlyStem as string,
-        h.yearly.earthlyBranch as string
-      ),
-    };
+    return scanHoroscopePatterns(a, h);
   }, [a, h]);
 
   if (!a || !an) return null;
