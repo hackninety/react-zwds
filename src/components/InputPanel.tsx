@@ -13,7 +13,13 @@ import {
   getCityNamesOfProvince,
   getDistrictNamesOfCity,
 } from "../core/cities";
-import { browserTimezone, formatOffset, listTimezones, resolveBirthPlace } from "../core/place";
+import {
+  browserTimezone,
+  formatOffset,
+  listTimezones,
+  resolveBirthPlace,
+  zoneOffsetMinutes,
+} from "../core/place";
 import type { BirthInput } from "../core/useZwds";
 
 /** 出生信息输入条：历法/日期/时辰/真太阳时（时刻+省市区）/流派 */
@@ -111,6 +117,24 @@ export function InputPanel({
     if (!draft.useTrueSolar || !solarStr) return null;
     return resolveBirthPlace(draft, solarStr, draft.exactTime || "12:00");
   }, [draft, solarStr]);
+
+  /**
+   * 中国大陆夏令时提示（1986~1991 每年 4 月中~9 月中，钟表拨快 1 小时）：
+   * 用 tzdb 实测 Asia/Shanghai 在出生时刻的偏移，命中 UTC+9 即提示。
+   * 出生证/记忆多为当时钟面时间，不回拨会错一个时辰。
+   */
+  const dstWarn = useMemo(() => {
+    if (draft.placeMode === "overseas" && draft.useTrueSolar) return null; // 海外模式选 Asia/Shanghai 已自动处理
+    if (!solarStr) return null;
+    const [y, m, d] = solarStr.split(/[-/.]/).map(Number);
+    if (!y || y < 1986 || y > 1991) return null;
+    const [hh, mi] = (draft.useTrueSolar && draft.exactTime ? draft.exactTime : "12:00")
+      .split(":")
+      .map(Number);
+    return zoneOffsetMinutes("Asia/Shanghai", y, m || 1, d || 1, hh || 12, mi || 0) === 540
+      ? `${y} 年该时段中国大陆实行夏令时（钟表拨快 1 小时）`
+      : null;
+  }, [draft.placeMode, draft.useTrueSolar, draft.exactTime, solarStr]);
 
   /** 真太阳时下预览推定的时辰 */
   const derivedIdx = useMemo(() => {
@@ -363,6 +387,13 @@ export function InputPanel({
       <button type="submit" className="btn-go">
         起 盘
       </button>
+
+      {dstWarn && (
+        <div className="dst-hint">
+          ⚠ {dstWarn}——若出生记录为当时钟表时间，请将时刻减 1 小时后输入；或勾选真太阳时并把出生地切为「海外」选
+          Asia/Shanghai（按 tzdb 自动换算，无需手动回拨）。
+        </div>
+      )}
 
       {draft.useTrueSolar && (
         <div className="ts-row">

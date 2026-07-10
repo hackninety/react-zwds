@@ -29,7 +29,14 @@ export function PalaceDetail({
   const snap = an.sanfang.find((s) => s.palaceIndex === index);
   const fly = an.flyMatrix.palaces.find((p) => p.palaceIndex === index);
   const jia = an.jiaGong.filter((j) => j.palaceIndex === index);
-  const patterns = an.patterns.filter((p) => p.where.startsWith(`${palace.name}(`));
+  // 该宫格局；全盘级格局（如日月反背，where 不以任何宫名开头）兜底归入命宫弹层
+  const patterns = an.patterns.filter((p) => {
+    if (p.where.startsWith(`${palace.name}(`)) return true;
+    if (palace.name === "命宫") {
+      return !a.palaces.some((x) => p.where.startsWith(`${x.name}(`));
+    }
+    return false;
+  });
 
   return (
     <div className="pd-overlay" onClick={onClose}>

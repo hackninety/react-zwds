@@ -12,7 +12,7 @@ const CYAN = "#55d7ff";
 
 const PAD_L = 34;
 const PAD_R = 10;
-const PAD_T = 24;
+const PAD_T = 34; // 顶部留两行段标签（窄段错排到上行防碰撞）
 const PAD_B = 26;
 const SLOT_W = 8;
 const BODY_W = 5;
@@ -45,15 +45,41 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
 
   /* 大限段背景（域无关,取自共享 bands）；落不进年份轴的段直接丢弃防堆叠 */
   const bandSlots = useMemo(() => {
-    return data.bands
+    const slots = data.bands
       .map((b) => {
         const start = years.findIndex((y) => y.year >= b.startYear);
         const endRaw = years.findIndex((y) => y.year > b.endYear);
         const end = (endRaw < 0 ? years.length : endRaw) - 1;
-        return { start, end, label: b.label };
+        return { start, end, label: b.label, row: 0 };
       })
       .filter((b) => b.start >= 0 && b.end >= b.start);
+    // 标签防碰撞：估宽后贪心分两行（窄段如童限放不下时抬到上行）
+    const rowEnd = [-Infinity, -Infinity];
+    for (const b of slots) {
+      const x = PAD_L + b.start * SLOT_W + 2;
+      const w = b.label.replace(/[^一-龥]/g, "").length * 9 +
+        b.label.replace(/[一-龥]/g, "").length * 5.2 + 8;
+      b.row = x >= rowEnd[0] ? 0 : 1;
+      rowEnd[b.row] = x + w;
+    }
+    return slots;
   }, [data.bands, years]);
+
+  /* 大限基调背景线：各段十年均分的阶梯线（衬在蜡烛后，看每个十年整体抬升/下沉） */
+  const avgSegs = useMemo(
+    () =>
+      domain.decadeAvg
+        .map((dv) => {
+          const s = years.findIndex((y) => y.year >= dv.startYear);
+          const eRaw = years.findIndex((y) => y.year > dv.endYear);
+          const e = (eRaw < 0 ? years.length : eRaw) - 1;
+          return s >= 0 && e >= s && dv.avg > 0
+            ? { x1: xOf(s), x2: xOf(e) + SLOT_W, y: yOf(dv.avg) }
+            : null;
+        })
+        .filter((v): v is NonNullable<typeof v> => v != null),
+    [domain.decadeAvg, years]
+  );
 
   const maPoints = useMemo(
     () =>
@@ -86,6 +112,7 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
           <i style={{ color: UP }}>红涨</i>
           <i style={{ color: DOWN }}>绿跌</i>
           <i style={{ color: GOLD }}>金线=5年均线</i>
+          <i style={{ color: "#7da2ff" }}>蓝阶=大限均值</i>
           <i>上影=进/下影=出，长上下影=大进大出</i>
           <i style={{ color: CYAN }}>点年份联动拨盘</i>
         </span>
@@ -137,7 +164,13 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
                     opacity={0.05}
                   />
                 )}
-                <text x={xOf(b.start) + 2} y={PAD_T - 9} fontSize={9} fill="#8fa3cc" opacity={0.85}>
+                <text
+                  x={xOf(b.start) + 2}
+                  y={b.row === 0 ? PAD_T - 8 : PAD_T - 20}
+                  fontSize={9}
+                  fill="#8fa3cc"
+                  opacity={b.row === 0 ? 0.85 : 0.7}
+                >
                   {b.label}
                 </text>
                 <text x={xOf(b.start) + 2} y={svgH - 8} fontSize={8} fill="#66759b" opacity={0.9}>
@@ -161,6 +194,19 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
                   {v}
                 </text>
               </g>
+            ))}
+
+            {avgSegs.map((s, si) => (
+              <line
+                key={`avg-${si}`}
+                x1={s.x1}
+                y1={s.y}
+                x2={s.x2}
+                y2={s.y}
+                stroke="#7da2ff"
+                strokeWidth={1.6}
+                strokeOpacity={0.38}
+              />
             ))}
 
             {years.map((y, i) => {

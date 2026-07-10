@@ -1781,3 +1781,33 @@ body {
   font-size: 0.68rem;
   flex: 1 1 300px;
 }
+
+/* ── 夏令时提示 ── */
+.dst-hint {
+  flex-basis: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.07);
+  color: var(--m-ke);
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+/* ── 移动端补充适配：弹层/飞线/合盘 ── */
+@media (max-width: 1024px) {
+  .pd-panel {
+    width: min(560px, 96vw);
+    max-height: 88vh;
+    padding: 12px 12px;
+    font-size: 0.74rem;
+  }
+  .pd-head b { font-size: 0.9rem; }
+  .pd-seats li { flex-wrap: wrap; }
+  .fly-label { font-size: 9px; }
+  .syn { padding: 10px 10px 8px; }
+  .syn-card { flex-basis: 140px; padding: 9px 10px; }
+  .syn-card-score { font-size: 1.6rem; }
+  .syn-dir { width: 38px; font-size: 0.62rem; }
+  .kline-month-canvas { overflow-x: auto; }
+}

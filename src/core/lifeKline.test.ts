@@ -112,12 +112,28 @@ describe("lifeKline 评分引擎", () => {
     }
   });
 
-  it("自化泄气写入 baselineNotes 且与宫干四化一致", () => {
+  it("baselineNotes 仅含自化泄气与杂曜域调两类注记", () => {
     for (const d of lk.domains) {
       for (const note of d.baselineNotes) {
-        expect(note).toMatch(/^自化[禄权科忌]/);
+        expect(note).toMatch(/^(自化[禄权科忌]|杂曜域调 )/);
       }
     }
+  });
+
+  it("同星叠象因子（叠禄/忌上加忌/禄逢冲破）与交限之年/童限标注出现", () => {
+    const all = lk.domains.flatMap((d) => d.years.flatMap((y) => y.factors)).join("|");
+    expect(all).toMatch(/叠禄（生年禄星/);
+    expect(all).toMatch(/忌上加忌（生年忌星/);
+    expect(all).toMatch(/禄逢冲破/);
+    // 交限之年：每个大限首年在所有域标注
+    const soul = lk.domains[0];
+    for (const d of decades.slice(0, 3)) {
+      const y = soul.years.find((x) => x.age === d.range[0]);
+      expect(y?.factors.some((f) => f.includes("交限之年"))).toBe(true);
+    }
+    // 童限年（该盘 3 岁上运 → 1~2 岁童限）
+    const first = soul.years.find((x) => x.age === 1);
+    expect(first?.factors.some((f) => f.includes("童限"))).toBe(true);
   });
 
   it("小限落宫公式与 iztro 各宫 ages 一致（男顺女逆交叉验证）", () => {

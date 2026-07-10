@@ -9,6 +9,7 @@
  *   固定基调 baseline(宫) = 三方四正星情（本宫×1.0 对宫×0.6 三合×0.4）
  *                          + 生年四化落三方四正（禄+3 权+2 科+2 忌-4,同权重）
  *                          + 身宫所在 +2
+ *                          + 杂曜按域加权（鸾喜→婚恋、天巫→升迁、孤寡→情感减等,按位权）
  *                          + 离心自化泄气（忌-2 禄-1 权/科-0.5）
  *   逐年 = 50 + baseline
  *          + 大限四化落三方四正（禄+6 权+4 科+3 忌-6,按位权）
@@ -20,6 +21,9 @@
  *          ※ 流马会禄（流禄/本命禄存/生年禄星同宫）→ 禄马交驰 +3
  *          ※ 流年化禄落生年忌宫 → 禄忌交缠·变动年 +2/-2（动能↑）
  *          + 小限入本宫 +1 / 小限冲本宫 -1（男顺女逆,生年支三合起宫）
+ *          ※ 同星叠象：生年禄星再化禄=叠禄 +2；生年忌星再化忌=忌上加忌(该笔×1.3)；
+ *            运限忌撞生年禄星=禄逢冲破 -2
+ *          + 交限之年（踏入新大限首年）+1/-1（动能↑）；童限年注明仅流年论
  *          + 命宫域岁限并临 -2
  *   收敛 [8,92]；K 线 open=上年 close,high/low 由进/出两股动能撑开。
  */
@@ -67,6 +71,42 @@ const FLOW_STAR_SCORE: Record<string, number> = {
 /** 鸾喜的婚恋域（加倍生效） */
 const LOVE_DOMAINS = new Set(["夫妻", "子女"]);
 const LUAN_XI = new Set(["流鸾", "流喜", "月鸾", "月喜"]);
+
+/**
+ * 杂曜按域加权（baseline 级）：星名 → { 域宫名: 分 }。
+ * 只让杂曜作用于其命理专长的域：鸾喜姚池主婚恋、天巫三台主升迁、
+ * 孤寡压情感、天月阴煞主病、天空破碎耗财……按三方四正位权 w 折算。
+ */
+const ADJ_DOMAIN: Record<string, Record<string, number>> = {
+  红鸾: { 夫妻: 1.5, 子女: 1 },
+  天喜: { 夫妻: 1.5, 子女: 1 },
+  天姚: { 夫妻: 0.5 },
+  咸池: { 夫妻: 0.5 },
+  孤辰: { 夫妻: -1.5, 福德: -0.5 },
+  寡宿: { 夫妻: -1.5, 福德: -0.5 },
+  天刑: { 官禄: -1, 疾厄: -1.5, 命宫: -0.5 },
+  天巫: { 官禄: 1.5, 迁移: 1 },
+  三台: { 官禄: 0.8 },
+  八座: { 官禄: 0.8 },
+  恩光: { 官禄: 0.8 },
+  天贵: { 官禄: 0.8 },
+  天官: { 官禄: 0.8 },
+  台辅: { 官禄: 0.5 },
+  封诰: { 官禄: 0.5 },
+  龙池: { 官禄: 0.5 },
+  凤阁: { 官禄: 0.5 },
+  华盖: { 福德: 1 },
+  天福: { 福德: 1 },
+  天哭: { 福德: -0.8 },
+  阴煞: { 疾厄: -1, 福德: -0.5 },
+  天月: { 疾厄: -1 },
+  天虚: { 疾厄: -0.8, 财帛: -0.5 },
+  天寿: { 疾厄: 1 },
+  解神: { 疾厄: 0.8, 命宫: 0.5 },
+  天空: { 财帛: -1, 福德: -0.5 },
+  破碎: { 财帛: -0.8 },
+  蜚廉: { 仆役: -0.5, 交友: -0.5 },
+};
 
 type FlowStarHit = { idx: number; name: string; v: number };
 const flowCache = new Map<string, FlowStarHit[]>();
@@ -234,6 +274,8 @@ export function buildLifeKline(
   };
 
   const natalYearStem = a.chineseDate.split(" ")[0]?.charAt(0) ?? "";
+  /** 生年四化星 → 四化位（0禄1权2科3忌），同星叠象判定用 */
+  const natalMutMap = new Map(mutHits(natalYearStem).map((h) => [h.star, h.k]));
   const lastAge = Math.min(100, decades[decades.length - 1].range[1]);
 
   /* 小限：生年支三合定起宫（寅午戌辰起…），男顺女逆，一岁一宫 */
@@ -281,6 +323,28 @@ export function buildLifeKline(
       if (w) baseline += w * MUT_NATAL_BASE[hit.k];
     }
     if (palace.isBodyPalace) baseline += 2;
+    // 杂曜按域加权：鸾喜姚池主婚恋、天巫三台主升迁、孤寡压情感、天月阴煞主病……
+    {
+      const pName = palace.name as string;
+      const domKey = pName === "事业" ? "官禄" : pName === "交友" ? "仆役" : pName;
+      let adjSum = 0;
+      const adjNames: string[] = [];
+      for (const [q, w] of wmap) {
+        for (const st of a.palaces[q].adjectiveStars) {
+          const v = ADJ_DOMAIN[st.name as string]?.[domKey];
+          if (v) {
+            adjSum += v * w;
+            adjNames.push(st.name as string);
+          }
+        }
+      }
+      if (Math.abs(adjSum) >= 0.5) {
+        baseline += adjSum;
+        baselineNotes.push(
+          `杂曜域调 ${fmt(adjSum)}（${[...new Set(adjNames)].slice(0, 4).join("、")}）`
+        );
+      }
+    }
     // 离心自化（本宫宫干四化本宫之星）：气外泄。忌最重=得而复失；禄权科小幅泄
     const selfMutKinds = new Set(
       mutHits(palace.heavenlyStem)
@@ -338,11 +402,28 @@ export function buildLifeKline(
             else if (pos === 1) nature.push(`${tag}${hit.star}忌冲本宫·被动`);
             else nature.push(`${tag}${hit.star}忌拖累三合`);
             factors.push(`${tag}${hit.star}化忌→${a.palaces[hit.idx].name}${pos === 1 ? "(冲本宫)" : ""} -${round(v)}`);
+            // 同星叠象：生年忌星再化忌=忌上加忌（应验最烈）；忌撞生年禄星=禄逢冲破
+            if (natalMutMap.get(hit.star) === 3) {
+              const extra = v * 0.3;
+              drain += extra;
+              jiDrainSum += extra;
+              nature.push("忌上加忌·应验加烈");
+              factors.push(`${tag}忌上加忌（生年忌星${hit.star}再化忌） -${round(extra)}`);
+            } else if (natalMutMap.get(hit.star) === 0) {
+              drain += 2;
+              nature.push("禄逢冲破·吉处藏凶");
+              factors.push(`${tag}忌撞生年禄星${hit.star}（禄逢冲破） -2`);
+            }
           } else {
             const v = w * MUT[hit.k];
             gain += v;
             if (Math.abs(v) >= 1)
               factors.push(`${tag}${hit.star}化${MUTAGEN_CHARS[hit.k]}→${a.palaces[hit.idx].name} ${fmt(v)}`);
+            // 同星叠象：生年禄星再化禄=叠禄（喜上加喜）
+            if (hit.k === 0 && natalMutMap.get(hit.star) === 0) {
+              gain += 2;
+              factors.push(`${tag}叠禄（生年禄星${hit.star}再化禄） +2`);
+            }
           }
         }
         if (jiHit) jiSources++;
@@ -425,6 +506,16 @@ export function buildLifeKline(
         nature.push("小限冲本宫·小动");
         factors.push("小限冲本宫 -1");
       }
+
+      // 交限之年：踏入新大限的第一年，新旧交轨、动能增（十字星倾向）
+      if (decade && age === decade.range[0]) {
+        gain += 1;
+        drain += 1;
+        nature.push("交限之年·转轨");
+        factors.push(`交限之年（入${decade.heavenlyStem}${decade.earthlyBranch}限） +1/-1`);
+      }
+      // 童限（未上运）：无大限四化参与，仅流年论
+      if (!decade) factors.push("童限（未上运，仅流年论）");
 
       // 岁限并临（命宫域）：动荡
       if (meta.priority === 0 && decade && gz === `${decade.heavenlyStem}${decade.earthlyBranch}`) {
@@ -514,7 +605,7 @@ export function buildLifeKline(
   );
 
   return {
-    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科·流曜吉·六合)」与「出(忌·冲·流羊陀·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。流曜十颗（魁钺昌曲禄羊陀马鸾喜，iztro 同源公式），鸾喜在夫妻/子女域加倍；忌落对宫按「冲本宫」加重；大限忌+流年忌同引为双忌叠加非线性放大；流禄会流马为禄马交驰；流禄落生年忌宫为禄忌交缠变动年。确定性推演,仅供参考娱乐。",
+    note: "紫微分域量化：每宫独立看其三方四正 + 四化落宫。区分「进(禄权科·流曜吉·六合)」与「出(忌·冲·流羊陀·自化漏)」两股动能——净决定 K 线涨跌，进撑上影、出压下影。故「大进大出」年为小实体长上下影(十字)，非单一好坏；出项再分主动(自化漏)/被动(忌冲)/纠缠(忌入)。流曜十颗（魁钺昌曲禄羊陀马鸾喜，iztro 同源公式），鸾喜在夫妻/子女域加倍；杂曜按域加权入基调（鸾喜→婚恋、天巫→升迁、孤寡→情感减）；忌落对宫按「冲本宫」加重；大限忌+流年忌同引为双忌叠加非线性放大；同星叠象（叠禄/忌上加忌/禄逢冲破）单列；交限之年动能增；流禄会流马为禄马交驰；流禄落生年忌宫为禄忌交缠变动年。确定性推演,仅供参考娱乐。",
     domains,
     bands,
     lastAge,
