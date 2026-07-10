@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { astro } from "iztro";
 import type { GenderName } from "iztro/lib/i18n";
-import type { Zwds } from "../core/useZwds";
+import { effectiveBirth, type Zwds } from "../core/useZwds";
 import { LUNAR_DAYS, LUNAR_MONTHS, MUTAGEN_TABLES, TIME_OPTIONS } from "../core/utils";
 import { daysInLunarMonth, leapMonthOf } from "../core/lunar";
 import { buildSynastry, buildSynastryMd } from "../core/synastry";
+import { listArchive } from "../core/archive";
 
 /** 乙方出生信息（甲方=当前主盘；流派/四化表/子时界沿用主盘设置保证口径一致） */
 type BInput = {
@@ -49,6 +50,27 @@ export function SynastryPanel({ z }: { z: Zwds }) {
   const [copied, setCopied] = useState(false);
 
   const set = <K extends keyof BInput>(k: K, v: BInput[K]) => setDraft((d) => ({ ...d, [k]: v }));
+
+  /** 从多盘档案取乙方：真太阳时档案折算为校正后的公历日期+时辰，保证口径一致 */
+  const archive = listArchive();
+  const pickFromArchive = (name: string) => {
+    const entry = archive.find((e) => e.name === name);
+    if (!entry) return;
+    const eff = effectiveBirth(entry.input);
+    let date = eff.dateStr;
+    if (eff.calendar === "solar") {
+      const [y, m, d] = eff.dateStr.split(/[-/.]/).map(Number);
+      if (y && m && d) date = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    setDraft({
+      name: entry.name,
+      gender: entry.input.gender,
+      calendar: eff.calendar,
+      date,
+      timeIndex: eff.timeIndex,
+      isLeapMonth: eff.calendar === "lunar" ? entry.input.isLeapMonth : false,
+    });
+  };
 
   /* 农历三下拉 */
   const ymd = useMemo(() => {
@@ -144,6 +166,20 @@ export function SynastryPanel({ z }: { z: Zwds }) {
       </div>
 
       <div className="syn-form">
+        {archive.length > 0 && (
+          <label className="fld" title="从多盘档案取乙方（真太阳时档案自动折算为校正后的公历+时辰）">
+            <span>从档案选</span>
+            <select value="" onChange={(e) => e.target.value && pickFromArchive(e.target.value)}>
+              <option value="">选择…（{archive.length}）</option>
+              {archive.map((e) => (
+                <option key={e.name} value={e.name}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <label className="fld">
           <span>乙方姓名</span>
           <input

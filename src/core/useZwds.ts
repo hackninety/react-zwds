@@ -119,47 +119,58 @@ const DEFAULT_VISIBLE: ScopeVisible = {
   hourly: false,
 };
 
+export type EffectiveBirth = {
+  calendar: "solar" | "lunar";
+  dateStr: string;
+  timeIndex: number;
+  trueSolar: TrueSolarInfo | null;
+};
+
+/**
+ * 真太阳时校正后的实际排盘参数（纯函数）。
+ * 排盘 Hook、合盘从档案取盘、生时校正等场景共用，保证同一口径。
+ */
+export function effectiveBirth(input: BirthInput): EffectiveBirth {
+  const base: EffectiveBirth = {
+    calendar: input.calendar,
+    dateStr: input.date,
+    timeIndex: input.timeIndex,
+    trueSolar: null,
+  };
+  if (!input.useTrueSolar || !input.exactTime) return base;
+  const solarStr =
+    input.calendar === "lunar" ? lunarStrToSolarStr(input.date, input.isLeapMonth) : input.date;
+  if (!solarStr) return base;
+  const resolved = resolveBirthPlace(input, solarStr, input.exactTime);
+  const adj = applyTrueSolar(
+    solarStr,
+    input.exactTime,
+    resolved.longitude,
+    resolved.clockOffsetMinutes
+  );
+  if (!adj) return base;
+  return {
+    calendar: "solar",
+    dateStr: adj.dateStr,
+    timeIndex: adj.timeIndex,
+    trueSolar: {
+      clockDate: solarStr,
+      clockTime: input.exactTime,
+      trueDate: adj.dateStr,
+      trueTime: adj.timeStr,
+      timeIndex: adj.timeIndex,
+      offsetMinutes: adj.offsetMinutes,
+      eotMinutes: adj.eotMinutes,
+      longitude: resolved.longitude,
+      clockOffsetMinutes: resolved.clockOffsetMinutes,
+      place: resolved.place,
+    },
+  };
+}
+
 export function useZwds(input: BirthInput) {
   /** 真太阳时校正后的实际排盘参数 */
-  const effective = useMemo(() => {
-    const base = {
-      calendar: input.calendar,
-      dateStr: input.date,
-      timeIndex: input.timeIndex,
-      trueSolar: null as TrueSolarInfo | null,
-    };
-    if (!input.useTrueSolar || !input.exactTime) return base;
-    const solarStr =
-      input.calendar === "lunar"
-        ? lunarStrToSolarStr(input.date, input.isLeapMonth)
-        : input.date;
-    if (!solarStr) return base;
-    const resolved = resolveBirthPlace(input, solarStr, input.exactTime);
-    const adj = applyTrueSolar(
-      solarStr,
-      input.exactTime,
-      resolved.longitude,
-      resolved.clockOffsetMinutes
-    );
-    if (!adj) return base;
-    return {
-      calendar: "solar" as const,
-      dateStr: adj.dateStr,
-      timeIndex: adj.timeIndex,
-      trueSolar: {
-        clockDate: solarStr,
-        clockTime: input.exactTime,
-        trueDate: adj.dateStr,
-        trueTime: adj.timeStr,
-        timeIndex: adj.timeIndex,
-        offsetMinutes: adj.offsetMinutes,
-        eotMinutes: adj.eotMinutes,
-        longitude: resolved.longitude,
-        clockOffsetMinutes: resolved.clockOffsetMinutes,
-        place: resolved.place,
-      },
-    };
-  }, [input]);
+  const effective = useMemo(() => effectiveBirth(input), [input]);
 
   const astrolabe = useMemo<Astrolabe | null>(() => {
     try {

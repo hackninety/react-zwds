@@ -1938,3 +1938,181 @@ body {
   .pat-grid { grid-template-columns: 1fr; }
   .pat-horo-row { flex-direction: column; gap: 3px; }
 }
+
+/* ── 多盘档案按钮 ── */
+.arc-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--dim);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.arc-btn:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+  box-shadow: 0 0 10px rgba(85, 215, 255, 0.2);
+}
+
+.arc-del:hover {
+  border-color: rgba(227, 91, 216, 0.5);
+  color: var(--m-ji);
+  box-shadow: 0 0 10px rgba(227, 91, 216, 0.25);
+}
+
+.rf-open {
+  color: var(--gold);
+  border-color: rgba(243, 201, 107, 0.35);
+}
+
+.rf-open:hover {
+  color: var(--gold);
+  box-shadow: 0 0 10px rgba(243, 201, 107, 0.3);
+}
+
+/* ── 生时校正助手弹层 ── */
+.rf-panel {
+  width: min(980px, 96vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: linear-gradient(170deg, rgba(16, 25, 50, 0.97), rgba(9, 14, 30, 0.99));
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 0 40px rgba(85, 215, 255, 0.15), 0 18px 50px rgba(0, 0, 0, 0.6);
+  font-size: 0.8rem;
+}
+
+.rf-tip {
+  margin: 0 0 10px;
+  color: var(--dim);
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+
+.rf-tip b { color: var(--text); }
+
+.rf-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rf-chip {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(5, 9, 20, 0.6);
+  color: var(--dim);
+  font-size: 0.73rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.rf-chip:hover { border-color: var(--line-strong); color: var(--text); }
+
+.rf-chip.on {
+  background: rgba(85, 215, 255, 0.16);
+  border-color: rgba(85, 215, 255, 0.55);
+  color: var(--cyan);
+}
+
+.rf-events {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rf-events-label { color: var(--dim); font-size: 0.74rem; }
+
+.rf-event { display: inline-flex; gap: 5px; }
+
+.rf-event input,
+.rf-event select {
+  background: rgba(5, 9, 20, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  padding: 4px 7px;
+  font-size: 0.74rem;
+  font-family: inherit;
+}
+
+.rf-event input { width: 76px; }
+
+.rf-table-wrap { overflow-x: auto; }
+
+.rf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.rf-table th {
+  text-align: left;
+  padding: 5px 8px;
+  color: var(--cyan);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.rf-table td {
+  padding: 6px 8px;
+  border-bottom: 1px dashed var(--line);
+  color: var(--text);
+  vertical-align: top;
+}
+
+.rf-table td b { display: block; }
+.rf-table td i { font-style: normal; color: var(--faint); font-size: 0.68rem; }
+
+.rf-majors { min-width: 130px; }
+.rf-hits { color: var(--dim); max-width: 200px; }
+
+.rf-ev-hit { color: var(--m-lu); font-style: normal; margin-right: 6px; }
+.rf-ev-miss { color: var(--faint); font-style: normal; margin-right: 6px; }
+
+.rf-best { background: rgba(243, 201, 107, 0.06); }
+
+.rf-score { color: var(--dim); }
+.rf-score-best { color: var(--gold); text-shadow: 0 0 8px rgba(243, 201, 107, 0.5); }
+
+.rf-use {
+  padding: 3px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(85, 215, 255, 0.4);
+  background: rgba(85, 215, 255, 0.07);
+  color: var(--cyan);
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.18s;
+}
+
+.rf-use:hover {
+  background: rgba(85, 215, 255, 0.16);
+  box-shadow: 0 0 10px rgba(85, 215, 255, 0.3);
+}
+
+.rf-note {
+  margin: 10px 0 0;
+  color: var(--faint);
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 1024px) {
+  .rf-panel { padding: 12px 10px; }
+  .rf-table { font-size: 0.7rem; }
+  .rf-table th, .rf-table td { padding: 4px 5px; }
+}

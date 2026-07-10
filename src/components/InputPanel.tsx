@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { listArchive, removeFromArchive, saveToArchive } from "../core/archive";
+import { RectifyPanel } from "./RectifyPanel";
 import {
   LUNAR_DAYS,
   LUNAR_MONTHS,
@@ -31,6 +33,10 @@ export function InputPanel({
   onApply: (v: BirthInput) => void;
 }) {
   const [draft, setDraft] = useState<BirthInput>(value);
+  const [showRectify, setShowRectify] = useState(false);
+  /** 档案版本号：存/删后自增触发重读 */
+  const [arcVer, setArcVer] = useState(0);
+  const archive = useMemo(() => listArchive(), [arcVer]);
 
   useEffect(() => setDraft(value), [value]);
 
@@ -154,7 +160,32 @@ export function InputPanel({
     onApply(draft);
   };
 
+  /* ── 多盘档案：保存当前输入 / 选择即起盘 / 删除同名档案 ── */
+  const saveArchive = () => {
+    saveToArchive(draft);
+    setArcVer((v) => v + 1);
+  };
+  const pickArchive = (name: string) => {
+    const entry = archive.find((e) => e.name === name);
+    if (entry) onApply(entry.input);
+  };
+  const removeArchive = () => {
+    const name = (draft.name || "").trim() || "无名";
+    removeFromArchive(name);
+    setArcVer((v) => v + 1);
+  };
+  const hasCurrentInArchive = archive.some((e) => e.name === ((draft.name || "").trim() || "无名"));
+
+  /** 校时选定：回填时辰并直接起盘（关闭真太阳时——时辰不详即无可靠钟表时刻） */
+  const pickHour = (timeIndex: number) => {
+    const next = { ...draft, timeIndex, useTrueSolar: false };
+    setDraft(next);
+    setShowRectify(false);
+    onApply(next);
+  };
+
   return (
+    <>
     <form className="input-panel" onSubmit={submit}>
       <label className="fld">
         <span>姓名</span>
@@ -177,6 +208,36 @@ export function InputPanel({
           title="常居住地（可选）：不参与排盘，随 AI 导出提供地域背景，增强分析"
         />
       </label>
+
+      <label className="fld" title="多盘档案：保存常用命盘，选择即起盘；合盘乙方也可从档案取人">
+        <span>档案</span>
+        <select value="" onChange={(e) => e.target.value && pickArchive(e.target.value)}>
+          <option value="">选择起盘…（{archive.length}）</option>
+          {archive.map((e) => (
+            <option key={e.name} value={e.name}>
+              {e.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        className="arc-btn"
+        onClick={saveArchive}
+        title="将当前输入保存到档案（按姓名索引，同名覆盖）"
+      >
+        存
+      </button>
+      {hasCurrentInArchive && (
+        <button
+          type="button"
+          className="arc-btn arc-del"
+          onClick={removeArchive}
+          title={`删除档案「${(draft.name || "").trim() || "无名"}」`}
+        >
+          删
+        </button>
+      )}
 
       <div className="seg" role="group" aria-label="性别">
         {(["男", "女"] as const).map((g) => (
@@ -303,6 +364,14 @@ export function InputPanel({
           ))}
         </select>
       </label>
+      <button
+        type="button"
+        className="arc-btn rf-open"
+        onClick={() => setShowRectify(true)}
+        title="生时校正助手：出生时辰不详时，十三时辰并排对比 + 性格特征/大事年份匹配评分"
+      >
+        校时
+      </button>
 
       <label className="fld">
         <span>流派</span>
@@ -498,5 +567,9 @@ export function InputPanel({
         </div>
       )}
     </form>
+    {showRectify && (
+      <RectifyPanel input={draft} onPick={pickHour} onClose={() => setShowRectify(false)} />
+    )}
+    </>
   );
 }
