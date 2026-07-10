@@ -921,9 +921,6 @@ body {
 
 /* ── 底部运限拨盘 ── */
 .hbar {
-  position: sticky;
-  bottom: 10px;
-  z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1318,7 +1315,7 @@ body {
   .btn-go { margin-left: 0; width: 100%; }
   .chart-outer { padding: 2px 0 6px; }
 
-  .hbar { padding: 5px; gap: 3px; bottom: 4px; border-radius: 10px; }
+  .hbar { padding: 5px; gap: 3px; border-radius: 10px; }
   .hlabel { width: 30px; letter-spacing: 0; font-size: 10.5px; border-radius: 6px; }
   .hcells { gap: 3px; }
   .hcell { min-width: 48px; padding: 2px 4px; border-radius: 5px; }
@@ -1810,4 +1807,134 @@ body {
   .syn-card-score { font-size: 1.6rem; }
   .syn-dir { width: 38px; font-size: 0.62rem; }
   .kline-month-canvas { overflow-x: auto; }
+}
+
+/* ── 格局·古籍语料面板 ── */
+.pat {
+  margin-top: 14px;
+  padding: 12px 14px 10px;
+  border-radius: 14px;
+  background: rgba(10, 16, 34, 0.6);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.pat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.pat-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(243, 201, 107, 0.4);
+}
+
+.pat-sub {
+  color: var(--dim);
+  font-size: 0.72rem;
+}
+
+.pat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.pat-card {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(165deg, rgba(16, 25, 50, 0.82), rgba(9, 14, 30, 0.92));
+  border-left-width: 3px;
+}
+
+.pat-card-吉 { border-left-color: rgba(52, 211, 153, 0.65); }
+.pat-card-凶 { border-left-color: rgba(227, 91, 216, 0.65); }
+.pat-card-注意 { border-left-color: rgba(251, 191, 36, 0.6); }
+
+.pat-name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.pat-name b {
+  color: var(--text);
+  font-size: 0.88rem;
+  letter-spacing: 1px;
+}
+
+.pat-name em {
+  font-style: normal;
+  color: var(--dim);
+  font-size: 0.72rem;
+}
+
+.pat-card p {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.pat-basis { color: var(--dim); }
+.pat-meaning { color: var(--text); }
+.pat-classic { color: var(--gold); }
+.pat-flaw { color: var(--m-ji); }
+
+.pat-none {
+  color: var(--faint);
+  font-size: 0.75rem;
+}
+
+.pat-horo {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.pat-horo h4 {
+  margin: 0 0 6px;
+  font-size: 0.76rem;
+  letter-spacing: 2px;
+  color: var(--cyan);
+}
+
+.pat-horo-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.pat-scope {
+  flex: none;
+  padding: 0 7px;
+  font-style: normal;
+  font-size: 0.7rem;
+  border-radius: 5px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.pat-scope-decadal { color: var(--c-decadal); border-color: rgba(46, 230, 200, 0.45); }
+.pat-scope-yearly { color: var(--c-yearly); border-color: rgba(91, 160, 255, 0.5); }
+
+.pat-horo-items p {
+  margin: 2px 0;
+  font-size: 0.75rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+@media (max-width: 1024px) {
+  .pat { padding: 9px 10px 8px; }
+  .pat-grid { grid-template-columns: 1fr; }
+  .pat-horo-row { flex-direction: column; gap: 3px; }
 }

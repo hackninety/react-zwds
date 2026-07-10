@@ -4,6 +4,7 @@ import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
 import { LifeKline } from "./components/LifeKline";
+import { PatternPanel } from "./components/PatternPanel";
 import { SynastryPanel } from "./components/SynastryPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { buildExportMd, downloadJson, downloadMd, downloadToon } from "./core/exportData";
@@ -151,6 +152,7 @@ export default function App() {
         <ErrorBoundary>
           <Chart z={z} genId={genId} />
           <HoroscopeBar z={z} />
+          <PatternPanel z={z} />
           <LifeKline z={z} />
           {showSyn && <SynastryPanel z={z} />}
         </ErrorBoundary>
