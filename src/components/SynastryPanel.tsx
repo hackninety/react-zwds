@@ -4,7 +4,8 @@ import type { GenderName } from "iztro/lib/i18n";
 import { effectiveBirth, type Zwds } from "../core/useZwds";
 import { LUNAR_DAYS, LUNAR_MONTHS, MUTAGEN_TABLES, TIME_OPTIONS } from "../core/utils";
 import { daysInLunarMonth, leapMonthOf } from "../core/lunar";
-import { buildSynastry, buildSynastryMd } from "../core/synastry";
+import { buildSynastry, buildSynastryMd, buildYearlySynastry } from "../core/synastry";
+import { buildLifeKline, decadesOfChart } from "../core/lifeKline";
 import { listArchive } from "../core/archive";
 
 /** 乙方出生信息（甲方=当前主盘；流派/四化表/子时界沿用主盘设置保证口径一致） */
@@ -126,6 +127,27 @@ export function SynastryPanel({ z }: { z: Zwds }) {
     return buildSynastry(z.astrolabe, bChart, z.input.name || "甲方", applied.name || "乙方");
   }, [z.astrolabe, z.input.name, bChart, applied]);
 
+  /** 乙方 K 线（流年合参用，按需构建一次） */
+  const bLifeKline = useMemo(() => {
+    if (!bChart) return null;
+    const by = bChart.rawDates.lunarDate.lunarYear;
+    return buildLifeKline(bChart, decadesOfChart(bChart, by), by);
+  }, [bChart]);
+
+  /** 流年合参：随主盘拨盘年份联动 */
+  const yearly = useMemo(() => {
+    if (!z.astrolabe || !bChart || !result) return null;
+    return buildYearlySynastry(
+      z.astrolabe,
+      bChart,
+      result.a.name,
+      result.b.name,
+      z.pick.year,
+      z.lifeKline,
+      bLifeKline
+    );
+  }, [z.astrolabe, bChart, result, z.pick.year, z.lifeKline, bLifeKline]);
+
   const go = () => {
     setApplied(draft);
     try {
@@ -137,7 +159,7 @@ export function SynastryPanel({ z }: { z: Zwds }) {
 
   const copyReport = async () => {
     if (!result) return;
-    const md = buildSynastryMd(result);
+    const md = buildSynastryMd(result, yearly);
     try {
       await navigator.clipboard.writeText(md);
       setCopied(true);
@@ -347,6 +369,88 @@ export function SynastryPanel({ z }: { z: Zwds }) {
               <p key={i}>◆ {s}</p>
             ))}
           </div>
+
+          {yearly && (
+            <div className="syn-year">
+              <h4>
+                流年合参 · {yearly.year} {yearly.gz}
+                <i>（随主盘拨盘年份联动）</i>
+              </h4>
+              <div className="syn-year-wrap">
+                <table className="syn-year-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>{yearly.a.name}</th>
+                      <th>{yearly.b.name}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>流年命宫叠</td>
+                      <td>
+                        本命{yearly.a.seatName}（{yearly.a.seatBranch}）
+                      </td>
+                      <td>
+                        本命{yearly.b.seatName}（{yearly.b.seatBranch}）
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>流年四化落宫</td>
+                      <td>{yearly.a.mutagenLines.join("，")}</td>
+                      <td>{yearly.b.mutagenLines.join("，")}</td>
+                    </tr>
+                    <tr>
+                      <td>命宫域K线</td>
+                      {[yearly.a, yearly.b].map((s, i) => (
+                        <td key={i}>
+                          {s.kline ? (
+                            <>
+                              <b className={s.kline.score >= 55 ? "dp-hi" : s.kline.score <= 45 ? "dp-lo" : ""}>
+                                {s.kline.score}
+                              </b>
+                              ·{s.kline.pattern}（净{s.kline.net >= 0 ? "+" : ""}
+                              {s.kline.net}）
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td>太岁</td>
+                      {[yearly.a, yearly.b].map((s, i) => (
+                        <td key={i} className={s.taisui === "冲太岁" || s.taisui === "刑太岁" ? "dp-lo" : ""}>
+                          {s.taisui}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td>运限格局</td>
+                      {[yearly.a, yearly.b].map((s, i) => (
+                        <td key={i}>
+                          {s.patterns.length
+                            ? s.patterns.map((p, k) => (
+                                <i key={k} className={`pd-kind pd-kind-${p.kind}`} title={`${p.basis}——${p.meaning}`}>
+                                  {p.name.replace("（运限）", "")}
+                                </i>
+                              ))
+                            : "无"}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="syn-year-concl">
+                {yearly.jiLine && <p>◆ {yearly.jiLine}</p>}
+                {yearly.conclusions.map((c, i) => (
+                  <p key={i}>◆ {c}</p>
+                ))}
+              </div>
+            </div>
+          )}
 
           <details className="syn-detail">
             <summary>互动明细（{result.factors.length} 项，标注方向与三维增减）</summary>

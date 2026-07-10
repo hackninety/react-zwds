@@ -16,7 +16,10 @@
  */
 import { util } from "iztro";
 import type { Astrolabe } from "./useZwds";
-import { MUTAGEN_CHARS, branchRelation } from "./utils";
+import { MUTAGEN_CHARS, branchRelation, yearGanZhi } from "./utils";
+import { lunarToSolarStr } from "./lunar";
+import { detectHoroscopePatterns, type HoroPattern } from "./analysis";
+import type { LifeKlineData } from "./lifeKline";
 
 export type SynDimScores = { love: number; career: number; wealth: number };
 
@@ -335,8 +338,149 @@ function buildSummary(
   return L;
 }
 
-/** 合盘报告 Markdown（复制给 AI 或留存） */
-export function buildSynastryMd(r: SynastryResult): string {
+/* ─────────────── 流年合参（双人当年对比） ─────────────── */
+
+export type YearlySide = {
+  name: string;
+  /** 流年命宫叠本命宫 */
+  seatName: string;
+  seatBranch: string;
+  /** 流年四化落宫：「禄=太阳→官禄」 */
+  mutagenLines: string[];
+  /** 命宫域 K 线该年 */
+  kline: { score: number; pattern: string; net: number } | null;
+  /** 与太岁关系：值/冲/刑/害/合/平 */
+  taisui: string;
+  patterns: HoroPattern[];
+};
+
+export type YearlySynastry = {
+  year: number;
+  gz: string;
+  a: YearlySide;
+  b: YearlySide;
+  /** 流年化忌星在双方盘各落何宫 */
+  jiLine: string;
+  conclusions: string[];
+};
+
+function yearlySide(
+  chart: Astrolabe,
+  name: string,
+  year: number,
+  gz: string,
+  lk: LifeKlineData | null
+): YearlySide | null {
+  const dateStr = lunarToSolarStr(year, 6, 15) ?? `${year}-7-15`;
+  let h: ReturnType<Astrolabe["horoscope"]>;
+  try {
+    h = chart.horoscope(dateStr, 0);
+  } catch {
+    return null;
+  }
+  const seat = chart.palaces[h.yearly.index];
+  const map = starPalaceMap(chart);
+  const stars = util.getMutagensByHeavenlyStem(gz.charAt(0) as never) as string[];
+  const mutagenLines = stars.map((star, k) => {
+    const idx = map.get(star);
+    return `${MUTAGEN_CHARS[k]}=${star}→${idx != null ? (chart.palaces[idx].name as string) : "?"}`;
+  });
+  const soulDomain = lk?.domains.find((d) => d.palaceName === "命宫");
+  const y = soulDomain?.years.find((x) => x.year === year);
+  const personBranch = (chart.chineseDate.split(" ")[0] ?? "").charAt(1);
+  const rel = branchRelation(gz.charAt(1), personBranch);
+  const taisui =
+    rel === "同支" || rel === "自刑"
+      ? "值太岁"
+      : rel === "对冲"
+        ? "冲太岁"
+        : rel === "相刑"
+          ? "刑太岁"
+          : rel === "相害"
+            ? "害太岁"
+            : rel === "六合" || rel === "三合"
+              ? "合太岁"
+              : "平";
+  return {
+    name,
+    seatName: (seat?.name as string) ?? "?",
+    seatBranch: (seat?.earthlyBranch as string) ?? "?",
+    mutagenLines,
+    kline: y ? { score: y.score, pattern: y.pattern, net: y.net } : null,
+    taisui,
+    patterns: detectHoroscopePatterns(
+      chart,
+      "yearly",
+      h.yearly.index,
+      h.yearly.heavenlyStem as string,
+      h.yearly.earthlyBranch as string
+    ),
+  };
+}
+
+/** 流年合参：同一公历年（流年干支相同）下，双人各自的引动与强弱对比 */
+export function buildYearlySynastry(
+  aChart: Astrolabe,
+  bChart: Astrolabe,
+  aName: string,
+  bName: string,
+  year: number,
+  aLk: LifeKlineData | null,
+  bLk: LifeKlineData | null
+): YearlySynastry | null {
+  const gz = yearGanZhi(year);
+  const a = yearlySide(aChart, aName || "甲方", year, gz, aLk);
+  const b = yearlySide(bChart, bName || "乙方", year, gz, bLk);
+  if (!a || !b) return null;
+
+  // 流年忌星在双方盘的落宫
+  const jiStar = (util.getMutagensByHeavenlyStem(gz.charAt(0) as never) as string[])[3] ?? "";
+  const seatOf = (chart: Astrolabe) => {
+    const idx = starPalaceMap(chart).get(jiStar);
+    return idx != null ? (chart.palaces[idx].name as string) : "?";
+  };
+  const jiLine = jiStar
+    ? `流年化忌（${jiStar}）落 ${a.name}【${seatOf(aChart)}】 / ${b.name}【${seatOf(bChart)}】——今年的坑各在此处`
+    : "";
+
+  const conclusions: string[] = [];
+  if (a.kline && b.kline) {
+    const diff = a.kline.score - b.kline.score;
+    if (Math.abs(diff) >= 8) {
+      const strong = diff > 0 ? a : b;
+      const weak = diff > 0 ? b : a;
+      conclusions.push(
+        `今年 ${strong.name} 明显更旺（${strong.kline!.score} vs ${weak.kline!.score}）：共同行动宜由 ${strong.name} 多担主导，${weak.name} 宜稳守配合。`
+      );
+    } else if (a.kline.score >= 60 && b.kline.score >= 60) {
+      conclusions.push(`双双顺遂（${a.kline.score} / ${b.kline.score}）：宜乘势共进，合作事项可提速。`);
+    } else if (a.kline.score <= 45 && b.kline.score <= 45) {
+      conclusions.push(`双双承压（${a.kline.score} / ${b.kline.score}）：共同事务宜守不宜攻，避免此时做重大绑定。`);
+    } else {
+      conclusions.push(`两人强弱相当（${a.kline.score} / ${b.kline.score}）：按分工各自推进即可。`);
+    }
+  }
+  for (const s of [a, b]) {
+    if (s.taisui === "冲太岁" || s.taisui === "刑太岁") {
+      conclusions.push(`${s.name} ${s.taisui}：本年变动与是非偏多，重大共同决策宜听多方意见、放缓节奏。`);
+    }
+  }
+  const notable = (s: YearlySide) => s.patterns.filter((p) => p.kind === "吉").map((p) => p.name);
+  const an = notable(a);
+  const bn = notable(b);
+  if (an.length || bn.length) {
+    conclusions.push(
+      `运限格局：${an.length ? `${a.name} 有 ${an.join("、")}` : ""}${an.length && bn.length ? "；" : ""}${
+        bn.length ? `${b.name} 有 ${bn.join("、")}` : ""
+      }——吉格所在的一方是当年发力点。`
+    );
+  }
+
+  return { year, gz, a, b, jiLine, conclusions };
+}
+
+/** 合盘报告 Markdown（复制给 AI 或留存；可附当前年流年合参） */
+export function buildSynastryMd(r: SynastryResult, yearly?: YearlySynastry | null): string {
   const L: string[] = [];
   L.push(`# 紫微斗数合盘：${r.a.name} × ${r.b.name}`);
   L.push("");
@@ -369,5 +513,26 @@ export function buildSynastryMd(r: SynastryResult): string {
   L.push("");
   for (const s of r.summary) L.push(`- ${s}`);
   L.push("");
+  if (yearly) {
+    L.push(`## 流年合参 · ${yearly.year} ${yearly.gz}`);
+    L.push("");
+    L.push(`| 项目 | ${yearly.a.name} | ${yearly.b.name} |`);
+    L.push(`|---|---|---|`);
+    L.push(`| 流年命宫叠 | 本命${yearly.a.seatName}（${yearly.a.seatBranch}） | 本命${yearly.b.seatName}（${yearly.b.seatBranch}） |`);
+    L.push(`| 流年四化落宫 | ${yearly.a.mutagenLines.join("，")} | ${yearly.b.mutagenLines.join("，")} |`);
+    L.push(
+      `| 命宫域K线 | ${yearly.a.kline ? `${yearly.a.kline.score}·${yearly.a.kline.pattern}（净${yearly.a.kline.net >= 0 ? "+" : ""}${yearly.a.kline.net}）` : "—"} | ${
+        yearly.b.kline ? `${yearly.b.kline.score}·${yearly.b.kline.pattern}（净${yearly.b.kline.net >= 0 ? "+" : ""}${yearly.b.kline.net}）` : "—"
+      } |`
+    );
+    L.push(`| 太岁 | ${yearly.a.taisui} | ${yearly.b.taisui} |`);
+    L.push(
+      `| 运限格局 | ${yearly.a.patterns.map((p) => p.name).join("、") || "无"} | ${yearly.b.patterns.map((p) => p.name).join("、") || "无"} |`
+    );
+    L.push("");
+    if (yearly.jiLine) L.push(`- ${yearly.jiLine}`);
+    for (const c of yearly.conclusions) L.push(`- ${c}`);
+    L.push("");
+  }
   return L.join("\n");
 }

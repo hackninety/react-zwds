@@ -28,6 +28,7 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
   const [domainKey, setDomainKey] = useState(data.domains[0].key);
   const [hover, setHover] = useState<number | null>(null);
   const [showMonthly, setShowMonthly] = useState(true);
+  const [showRadar, setShowRadar] = useState(true);
   const boxRef = useRef<HTMLDivElement>(null);
   const curYear = useMemo(() => todayLunar().year, []);
 
@@ -117,7 +118,14 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
           <i style={{ color: CYAN }}>点年份联动拨盘</i>
         </span>
         <button
-          className={`kline-mbtn ${showMonthly ? "on" : ""}`}
+          className={`kline-mbtn ${showRadar ? "on" : ""}`}
+          onClick={() => setShowRadar((v) => !v)}
+          title="展开/收起选中年份的十二域雷达图（一眼比较该年各域强弱）"
+        >
+          雷达
+        </button>
+        <button
+          className={`kline-mbtn kline-mbtn-tight ${showMonthly ? "on" : ""}`}
           onClick={() => setShowMonthly((v) => !v)}
           title="展开/收起选中年份的逐月细化K线（月干四化+月支冲合+月曜）"
         >
@@ -314,10 +322,109 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
         </div>
       </div>
 
-      {showMonthly && <MonthKline z={z} domain={domain} />}
+      <div className="kline-panels">
+        {showMonthly && <MonthKline z={z} domain={domain} />}
+        {showRadar && <YearRadar z={z} data={data} />}
+      </div>
 
       <p className="kline-note">{data.note}</p>
     </section>
+  );
+}
+
+/* ─────────────── 十二域年度雷达图 ─────────────── */
+
+const R_SIZE = 320;
+const R_CX = R_SIZE / 2;
+const R_CY = R_SIZE / 2 + 6;
+const R_MAX = 104;
+
+function YearRadar({ z, data }: { z: Zwds; data: LifeKlineData }) {
+  const year = z.pick.year;
+  const pts = useMemo(
+    () =>
+      data.domains.map((d) => ({
+        label: d.label.split("·")[0],
+        score: d.years.find((y) => y.year === year)?.score ?? null,
+      })),
+    [data.domains, year]
+  );
+
+  if (pts.every((p) => p.score == null)) return null;
+
+  const angle = (i: number) => (Math.PI * 2 * i) / 12 - Math.PI / 2;
+  const pos = (i: number, r: number) => ({
+    x: R_CX + Math.cos(angle(i)) * r,
+    y: R_CY + Math.sin(angle(i)) * r,
+  });
+  const rOf = (score: number) => (score / 100) * R_MAX;
+
+  const poly = pts
+    .map((p, i) => {
+      const { x, y } = pos(i, rOf(p.score ?? 0));
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  const scores = pts.map((p) => p.score ?? 0);
+  const maxIdx = scores.indexOf(Math.max(...scores));
+  const minIdx = scores.indexOf(Math.min(...scores));
+
+  return (
+    <div className="kline-radar">
+      <div className="kline-sub">
+        {year} 年 · 十二域雷达（<i style={{ color: GOLD }}>金=最强</i>·
+        <i style={{ color: "#e35bd8" }}>紫=最弱</i>）
+      </div>
+      <svg width={R_SIZE} height={R_SIZE} className="kline-svg" aria-hidden="true">
+        {[20, 50, 80].map((v) => (
+          <polygon
+            key={v}
+            points={pts.map((_, i) => `${pos(i, rOf(v)).x},${pos(i, rOf(v)).y}`).join(" ")}
+            fill="none"
+            stroke="#7da2ff"
+            strokeOpacity={v === 50 ? 0.25 : 0.12}
+            strokeDasharray={v === 50 ? "3 3" : "2 4"}
+          />
+        ))}
+        {pts.map((_, i) => {
+          const o = pos(i, R_MAX);
+          return (
+            <line
+              key={i}
+              x1={R_CX}
+              y1={R_CY}
+              x2={o.x}
+              y2={o.y}
+              stroke="#7da2ff"
+              strokeOpacity={0.1}
+            />
+          );
+        })}
+        <polygon points={poly} fill="rgba(85,215,255,0.16)" stroke={CYAN} strokeWidth={1.5} />
+        {pts.map((p, i) => {
+          if (p.score == null) return null;
+          const v = pos(i, rOf(p.score));
+          const color = i === maxIdx ? GOLD : i === minIdx ? "#e35bd8" : CYAN;
+          const lb = pos(i, R_MAX + 16);
+          return (
+            <g key={p.label}>
+              <circle cx={v.x} cy={v.y} r={i === maxIdx || i === minIdx ? 3.6 : 2.4} fill={color} />
+              <text
+                x={lb.x}
+                y={lb.y + 3}
+                fontSize={10}
+                textAnchor="middle"
+                fill={i === maxIdx ? GOLD : i === minIdx ? "#e35bd8" : "#8fa3cc"}
+              >
+                {p.label}
+                {p.score}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 

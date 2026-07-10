@@ -4,10 +4,11 @@ import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
 import { LifeKline } from "./components/LifeKline";
+import { DecadePlan } from "./components/DecadePlan";
 import { PatternPanel } from "./components/PatternPanel";
 import { SynastryPanel } from "./components/SynastryPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { buildExportMd, downloadJson, downloadMd, downloadToon } from "./core/exportData";
+import { buildExportAiText, downloadMd, downloadToon } from "./core/exportData";
 
 const STORAGE_KEY = "zwds-input-v2";
 
@@ -71,16 +72,16 @@ export default function App() {
     (window as unknown as { __zwds: typeof z }).__zwds = z;
   }
 
-  /** 复制 MD 全文到剪贴板（直接粘贴给 AI）；剪贴板不可用时退回下载 */
-  const copyMd = async () => {
-    const md = buildExportMd(z);
-    if (!md) return;
+  /** 复制 AI 载荷（TOON 数据+推理指引+知识附录）；剪贴板不可用时退回下载 TOON */
+  const copyAi = async () => {
+    const text = buildExportAiText(z);
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(md);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      downloadMd(z);
+      downloadToon(z);
     }
   };
 
@@ -114,8 +115,8 @@ export default function App() {
           <button
             type="button"
             disabled={!z.astrolabe}
-            onClick={copyMd}
-            title="复制完整命盘报告（含格局/飞宫/三方四正快照与推理指引）到剪贴板，直接粘贴给 AI"
+            onClick={copyAi}
+            title="复制 AI 分析载荷（TOON 紧凑数据 + 推理指引 + 规则/星情/主题知识附录）到剪贴板，直接粘贴给 AI"
           >
             {copied ? "已复制 ✓" : "复制给 AI"}
           </button>
@@ -123,17 +124,9 @@ export default function App() {
             type="button"
             disabled={!z.astrolabe}
             onClick={() => downloadToon(z)}
-            title="导出 TOON 格式（面向 LLM 的紧凑表格化编码，与 JSON 同数据、token 大幅缩减），适合直接喂给 AI"
+            title="导出 TOON 格式（面向 LLM 的紧凑表格化编码，token 大幅缩减），适合直接喂给 AI"
           >
             导出 TOON
-          </button>
-          <button
-            type="button"
-            disabled={!z.astrolabe}
-            onClick={() => downloadJson(z)}
-            title="导出完整命盘+运限数据（JSON），供程序处理或 AI 分析"
-          >
-            导出 JSON
           </button>
           <button
             type="button"
@@ -154,6 +147,7 @@ export default function App() {
           <HoroscopeBar z={z} />
           <PatternPanel z={z} />
           <LifeKline z={z} />
+          <DecadePlan z={z} />
           {showSyn && <SynastryPanel z={z} />}
         </ErrorBoundary>
       ) : (

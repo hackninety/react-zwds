@@ -2116,3 +2116,128 @@ body {
   .rf-table { font-size: 0.7rem; }
   .rf-table th, .rf-table td { padding: 4px 5px; }
 }
+
+/* ── 十年规划表 ── */
+.dp {
+  margin-top: 14px;
+  padding: 12px 14px 10px;
+  border-radius: 14px;
+  background: rgba(10, 16, 34, 0.6);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.dp-link { color: var(--cyan); font-style: normal; }
+
+.dp-wrap { overflow-x: auto; }
+
+.dp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.dp-table th {
+  text-align: left;
+  padding: 5px 8px;
+  color: var(--cyan);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.dp-table td {
+  padding: 6px 8px;
+  border-bottom: 1px dashed var(--line);
+  color: var(--text);
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.dp-table tbody tr { cursor: pointer; transition: background 0.15s; }
+.dp-table tbody tr:hover { background: rgba(85, 215, 255, 0.05); }
+
+.dp-current {
+  background: rgba(46, 230, 200, 0.07);
+  box-shadow: inset 3px 0 0 var(--c-decadal);
+}
+
+.dp-table td i { font-style: normal; color: var(--faint); font-size: 0.68rem; }
+.dp-years { color: var(--dim); }
+.dp-mut { color: var(--dim); }
+.dp-hi { color: #ff4d6d; }
+.dp-lo { color: var(--m-lu); }
+.dp-mark { font-size: 0.72rem; }
+
+.dp-pats { white-space: normal; min-width: 150px; }
+.dp-pats .pd-kind { margin: 0 4px 3px 0; cursor: help; }
+
+/* ── K线附属面板（月线+雷达并排） ── */
+.kline-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-start;
+}
+
+.kline-radar {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.kline-mbtn-tight { margin-left: 8px; }
+
+/* ── 合盘·流年合参 ── */
+.syn-year {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(91, 160, 255, 0.3);
+  background: rgba(91, 160, 255, 0.05);
+}
+
+.syn-year h4 {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  color: var(--c-yearly);
+}
+
+.syn-year h4 i { font-style: normal; font-size: 0.68rem; color: var(--dim); letter-spacing: 0; }
+
+.syn-year-wrap { overflow-x: auto; }
+
+.syn-year-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.syn-year-table th {
+  text-align: left;
+  padding: 4px 8px;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+}
+
+.syn-year-table td {
+  padding: 5px 8px;
+  border-bottom: 1px dashed var(--line);
+  color: var(--dim);
+  vertical-align: top;
+}
+
+.syn-year-table td:first-child { white-space: nowrap; color: var(--faint); }
+.syn-year-table td b { color: var(--text); }
+.syn-year-table .pd-kind { margin: 0 4px 2px 0; cursor: help; }
+
+.syn-year-concl { margin-top: 6px; }
+.syn-year-concl p { margin: 3px 0; font-size: 0.76rem; color: var(--text); line-height: 1.6; }
+
+@media (max-width: 1024px) {
+  .dp { padding: 9px 10px 8px; }
+  .dp-table { font-size: 0.7rem; }
+  .dp-table th, .dp-table td { padding: 4px 5px; }
+  .kline-panels { flex-direction: column; }
+}

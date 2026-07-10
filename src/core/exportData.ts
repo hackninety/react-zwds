@@ -14,6 +14,7 @@ import {
   type HoroPattern,
 } from "./analysis";
 import { buildMonthlyKline } from "./lifeKline";
+import { buildDecadePlan } from "./decadePlan";
 import { RULEBOOK_MD, STAR_MUTAGEN_MD, topicGuidesMd } from "./knowledge";
 
 /** 本宫自化（离心）：宫干四化命中本宫主星/辅星 */
@@ -236,6 +237,8 @@ export function buildExportData(z: Zwds) {
     palaces,
     analysis: z.analysis ?? analyzeChart(a),
     horoscope,
+    /** 十年规划表：一限一行（叠宫/四化/命宫域均值/高光低谷/运限格局） */
+    decadePlan: buildDecadePlan(a, z.decades, z.lifeKline),
     lifeKline: serializeLifeKline(z),
     /** L1 知识层：推理规则速查（Markdown 文本，供 AI 直接遵循） */
     rulebook: RULEBOOK_MD,
@@ -630,19 +633,22 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(scopeSection(a, "hourly", h.hourly, `（${z.hours[z.pick.hour]?.label ?? ""}）`));
   }
 
-  /* 七、十二大限总览 */
-  const all = getAllDecadals(z);
-  if (all.length) {
-    L.push(`## 七、十二大限总览`);
+  /* 七、十年规划表（十二大限总览增强版） */
+  const plan = buildDecadePlan(a, z.decades, z.lifeKline);
+  if (plan.length) {
+    L.push(`## 七、十年规划表（十二大限总览）`);
     L.push("");
-    L.push(`| 年龄段（虚岁） | 大限干支 | 大限命宫落宫 | 四化（禄/权/科/忌） |`);
-    L.push(`|---|---|---|---|`);
-    for (const d of all) {
-      const range = d.ageRange as [number, number];
-      const idx = d.index as number;
-      const seat = a.palaces[idx];
+    L.push(`> 一限一行：叠宫=该十年主题；均值/高光/低谷取综合·命宫域 K 线；运限格局为该限三方扫描（程序确定性检测，直接引用）。`);
+    L.push("");
+    L.push(`| 大限(虚岁) | 干支 | 公历 | 命宫叠 | 四化(禄/权/科/忌) | 均值 | 高光年 | 低谷年 | 运限格局 |`);
+    L.push(`|---|---|---|---|---|---|---|---|---|`);
+    for (const r of plan) {
       L.push(
-        `| ${range[0]}~${range[1]} | ${d.heavenlyStem}${d.earthlyBranch} | ${seat?.name}（${seat?.earthlyBranch}） | ${(d.mutagen as string[]).join(" / ")} |`
+        `| ${r.ageRange} | ${r.gz} | ${r.startYear}~${r.endYear} | ${r.seatName}（${r.seatBranch}） | ${r.mutagens.join(" / ")} | ${r.avg ?? "—"} | ${
+          r.best ? `${r.best.year}(${r.best.score})` : "—"
+        } | ${r.worst ? `${r.worst.year}(${r.worst.score})` : "—"} | ${
+          r.patterns.length ? r.patterns.map((p) => `${p.name}〔${p.kind}〕`).join("、") : "—"
+        } |`
       );
     }
     L.push("");
@@ -817,10 +823,35 @@ function baseFilename(z: Zwds): string {
   return `紫微斗数_${name}_${z.astrolabe?.solarDate ?? ""}`;
 }
 
-export function downloadJson(z: Zwds) {
-  const data = buildExportData(z);
-  if (!data) return;
-  download(`${baseFilename(z)}.json`, JSON.stringify(data, null, 2), "application/json;charset=utf-8");
+/** TOON 场景下的推理指引（字段路径版，替代 MD 的章节号引用） */
+const TOON_GUIDE = `# 紫微斗数命盘（AI 分析用 · TOON 数据 + 知识附录）
+
+> 本文件依次为：①推理指引 ②TOON 结构化命盘数据 ③附录A规则速查 / 附录C星情要诀 / 附录D主题指引。
+> TOON 为面向 LLM 的紧凑编码：\`键[N]{字段}:\` 表头后逐行为对应值，缩进表层级。
+
+请以严谨的紫微斗数分析师身份，严格依据数据推理：
+1. 先复述盘面骨架（basic 基本信息 + analysis.patterns 已检出格局 + 生年四化落宫），确认无误再分析；
+2. 三方四正、格局、飞宫四化、夹宫、借星均已确定性算好——直接引用 analysis.sanfang / analysis.patterns / analysis.flyMatrix / analysis.jiaGong / analysis.borrowed 与 horoscope.horoscopePatterns（运限格局），不要自行重算宫位关系；若需推衍未列关系，按 palaces[].index 环形计算（0=寅，对宫=+6，三合=±4）；
+3. 推理次序：本命（性格/禀赋/格局）→ 大限（horoscope.decadal 与 decadePlan 十年规划表）→ 流年（horoscope.yearly + lifeKline 各域该年 进/出/净/形态）→ 流月（lifeKline.monthlyOfSelectedYear 定应期）；
+4. 每个论断注明依据（引用具体字段），区分「结构必然 / 大概率 / 倾向参考」三档确定度；
+5. 口径以 meta 为准（meta.mutagenTableDetail 为实际生效四化全表），推理框架遵循下方附录A，星情与四化事象遵循附录C，按提问主题取用附录D对应小节。`;
+
+/**
+ * 「复制给 AI」的完整载荷：TOON 数据 + 推理指引 + 知识附录（A规则/C星情/D主题）。
+ * 比 MD 全文省 token，又不丢失知识层。
+ */
+export function buildExportAiText(z: Zwds): string | null {
+  const toon = buildExportToon(z);
+  if (!toon) return null;
+  return [
+    TOON_GUIDE,
+    "```toon",
+    toon,
+    "```",
+    RULEBOOK_MD,
+    STAR_MUTAGEN_MD,
+    topicGuidesMd(),
+  ].join("\n\n");
 }
 
 /**

@@ -244,6 +244,20 @@ function palaceStarScore(a: Astrolabe, idx: number): { s: number; badNames: stri
   return { s: bright + clamp(good, 0, 6) + clamp(bad, -8, 0), badNames };
 }
 
+/** 从命盘提取十二大限（与 useZwds 同口径），供合盘/校时等场景独立构建 K 线 */
+export function decadesOfChart(a: Astrolabe, birthLunarYear: number): DecadeInfo[] {
+  return a.palaces
+    .map((p) => ({
+      palaceIndex: p.index,
+      range: p.decadal.range as [number, number],
+      heavenlyStem: p.decadal.heavenlyStem as string,
+      earthlyBranch: p.decadal.earthlyBranch as string,
+      startYear: birthLunarYear + p.decadal.range[0] - 1,
+      endYear: birthLunarYear + p.decadal.range[1] - 1,
+    }))
+    .sort((a2, b2) => a2.range[0] - b2.range[0]);
+}
+
 export function buildLifeKline(
   astrolabe: Astrolabe | null,
   decades: DecadeInfo[],
