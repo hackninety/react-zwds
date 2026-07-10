@@ -34,6 +34,57 @@ export const TIME_OPTIONS = [
 export const mod = (n: number, m: number) => ((n % m) + m) % m;
 export const fixIndex = (n: number) => mod(n, 12);
 
+/* ── 地支关系表（K线引动/合盘共用） ── */
+
+/** 六冲 */
+export const BRANCH_CHONG: Record<string, string> = {
+  子: "午", 午: "子", 丑: "未", 未: "丑", 寅: "申", 申: "寅",
+  卯: "酉", 酉: "卯", 辰: "戌", 戌: "辰", 巳: "亥", 亥: "巳",
+};
+
+/** 六合 */
+export const BRANCH_LIUHE: Record<string, string> = {
+  子: "丑", 丑: "子", 寅: "亥", 亥: "寅", 卯: "戌", 戌: "卯",
+  辰: "酉", 酉: "辰", 巳: "申", 申: "巳", 午: "未", 未: "午",
+};
+
+/** 三合局（同组两支即为三合） */
+export const BRANCH_SANHE_GROUP: Record<string, string> = {
+  申: "水", 子: "水", 辰: "水",
+  亥: "木", 卯: "木", 未: "木",
+  寅: "火", 午: "火", 戌: "火",
+  巳: "金", 酉: "金", 丑: "金",
+};
+
+/** 六害 */
+export const BRANCH_HAI: Record<string, string> = {
+  子: "未", 未: "子", 丑: "午", 午: "丑", 寅: "巳", 巳: "寅",
+  卯: "辰", 辰: "卯", 申: "亥", 亥: "申", 酉: "戌", 戌: "酉",
+};
+
+/** 相刑（无恩/恃势/无礼，双向展开）；辰午酉亥为自刑（同支论） */
+export const BRANCH_XING: Record<string, string[]> = {
+  寅: ["巳", "申"], 巳: ["申", "寅"], 申: ["寅", "巳"],
+  丑: ["戌", "未"], 戌: ["未", "丑"], 未: ["丑", "戌"],
+  子: ["卯"], 卯: ["子"],
+};
+
+export const BRANCH_SELF_XING = new Set(["辰", "午", "酉", "亥"]);
+
+/** 两地支关系（按 合>三合>冲>刑>害>自刑/同支 优先级取一） */
+export function branchRelation(
+  x: string,
+  y: string
+): "六合" | "三合" | "对冲" | "相刑" | "相害" | "自刑" | "同支" | "无" {
+  if (BRANCH_LIUHE[x] === y) return "六合";
+  if (x !== y && BRANCH_SANHE_GROUP[x] && BRANCH_SANHE_GROUP[x] === BRANCH_SANHE_GROUP[y]) return "三合";
+  if (BRANCH_CHONG[x] === y) return "对冲";
+  if (BRANCH_XING[x]?.includes(y)) return "相刑";
+  if (BRANCH_HAI[x] === y) return "相害";
+  if (x === y) return BRANCH_SELF_XING.has(x) ? "自刑" : "同支";
+  return "无";
+}
+
 /** 农历年干支（以农历年为单位，1984 甲子） */
 export function yearGanZhi(lunarYear: number): string {
   return STEMS[mod(lunarYear - 4, 10)] + BRANCHES[mod(lunarYear - 4, 12)];

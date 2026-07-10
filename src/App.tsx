@@ -4,6 +4,7 @@ import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
 import { LifeKline } from "./components/LifeKline";
+import { SynastryPanel } from "./components/SynastryPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { buildExportMd, downloadJson, downloadMd, downloadToon } from "./core/exportData";
 
@@ -54,7 +55,15 @@ export default function App() {
   // 每次起盘自增，用于强制盘面回到默认命宫位置（即使命宫索引与上一盘相同）
   const [genId, setGenId] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [showSyn, setShowSyn] = useState(false);
   const z = useZwds(input);
+
+  const toggleSyn = () => {
+    setShowSyn((v) => {
+      if (!v) setTimeout(() => document.getElementById("synastry")?.scrollIntoView({ behavior: "smooth" }), 60);
+      return !v;
+    });
+  };
 
   // 开发调试句柄：控制台可直接取盘验证导出（生产构建不注入）
   if (import.meta.env.DEV) {
@@ -92,6 +101,15 @@ export default function App() {
         <h1>紫微斗数</h1>
         <span className="top-sub">玄机排盘 · iztro 引擎 · 自研盘面</span>
         <div className="top-actions">
+          <button
+            type="button"
+            disabled={!z.astrolabe}
+            className={showSyn ? "on-syn" : ""}
+            onClick={toggleSyn}
+            title="合盘：与另一人（同性/异性均可）互参姻缘、事业合伙、金钱财路相性"
+          >
+            合盘
+          </button>
           <button
             type="button"
             disabled={!z.astrolabe}
@@ -134,6 +152,7 @@ export default function App() {
           <Chart z={z} genId={genId} />
           <HoroscopeBar z={z} />
           <LifeKline z={z} />
+          {showSyn && <SynastryPanel z={z} />}
         </ErrorBoundary>
       ) : (
         <div className="err-box">

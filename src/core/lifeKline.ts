@@ -26,17 +26,17 @@
 import { util } from "iztro";
 import { getHoroscopeStar } from "iztro/lib/star/horoscopeStar";
 import type { Astrolabe, DecadeInfo } from "./useZwds";
-import { BRANCHES, LUNAR_MONTHS, MUTAGEN_CHARS, fixIndex, monthGanZhi, yearGanZhi } from "./utils";
+import {
+  BRANCHES,
+  BRANCH_CHONG as CHONG,
+  BRANCH_LIUHE as LIU_HE,
+  LUNAR_MONTHS,
+  MUTAGEN_CHARS,
+  fixIndex,
+  monthGanZhi,
+  yearGanZhi,
+} from "./utils";
 import { leapMonthOf } from "./lunar";
-
-const CHONG: Record<string, string> = {
-  子: "午", 午: "子", 丑: "未", 未: "丑", 寅: "申", 申: "寅",
-  卯: "酉", 酉: "卯", 辰: "戌", 戌: "辰", 巳: "亥", 亥: "巳",
-};
-const LIU_HE: Record<string, string> = {
-  子: "丑", 丑: "子", 寅: "亥", 亥: "寅", 卯: "戌", 戌: "卯",
-  辰: "酉", 酉: "辰", 巳: "申", 申: "巳", 午: "未", 未: "午",
-};
 
 const BRIGHT_SCORE: Record<string, number> = { 庙: 3, 旺: 2, 得: 1, 利: 1, 平: 0, 不: -1, 陷: -2 };
 const GOOD_STARS: Record<string, number> = {
@@ -252,6 +252,9 @@ export function buildLifeKline(
     bands.push({ label: "童限", startYear: birthLunarYear, endYear: birthLunarYear + firstAge - 2 });
   }
   for (const d of decades) {
+    // 起限岁超出显示范围（lastAge 封顶 100）的大限段不入 bands，
+    // 否则前端定位落到 -1 被钳回 0，标签全部堆叠在最左侧
+    if (d.range[0] > lastAge) continue;
     bands.push({
       label: `${d.heavenlyStem}${d.earthlyBranch}限 ${d.range[0]}-${d.range[1]}`,
       startYear: birthLunarYear + d.range[0] - 1,

@@ -43,6 +43,20 @@ describe("lifeKline 评分引擎", () => {
     expect(lk.domains[0].palaceName).toBe("命宫");
   });
 
+  it("大限段 bands 不越界（回归：超出 lastAge 的大限段曾堆叠在最左侧）", () => {
+    const lastYear = birthYear + lk.lastAge - 1;
+    for (const b of lk.bands) {
+      expect(b.startYear).toBeLessThanOrEqual(lastYear);
+      expect(b.endYear).toBeGreaterThanOrEqual(b.startYear);
+    }
+    // 起限岁超过 lastAge 的大限不应出现
+    const over = decades.filter((d) => d.range[0] > lk.lastAge);
+    for (const d of over) {
+      expect(lk.bands.some((b) => b.label.includes(`${d.range[0]}-${d.range[1]}`))).toBe(false);
+    }
+    expect(over.length).toBeGreaterThan(0); // 该盘确实存在越界大限（113-122 等），保证回归有效
+  });
+
   it("逐年数值不变量：范围/进出净/动能/OHLC 影线", () => {
     for (const d of lk.domains) {
       expect(d.baseline).toBeGreaterThanOrEqual(-18);

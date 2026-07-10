@@ -43,14 +43,16 @@ function KlineInner({ data, z }: { data: LifeKlineData; z: Zwds }) {
   const yOf = (v: number) => PAD_T + ((100 - v) / 100) * CHART_H;
   const xOf = (i: number) => PAD_L + i * SLOT_W;
 
-  /* 大限段背景（域无关,取自共享 bands） */
+  /* 大限段背景（域无关,取自共享 bands）；落不进年份轴的段直接丢弃防堆叠 */
   const bandSlots = useMemo(() => {
-    return data.bands.map((b) => {
-      const start = years.findIndex((y) => y.year >= b.startYear);
-      const endRaw = years.findIndex((y) => y.year > b.endYear);
-      const end = (endRaw < 0 ? years.length : endRaw) - 1;
-      return { start: start < 0 ? 0 : start, end, label: b.label };
-    });
+    return data.bands
+      .map((b) => {
+        const start = years.findIndex((y) => y.year >= b.startYear);
+        const endRaw = years.findIndex((y) => y.year > b.endYear);
+        const end = (endRaw < 0 ? years.length : endRaw) - 1;
+        return { start, end, label: b.label };
+      })
+      .filter((b) => b.start >= 0 && b.end >= b.start);
   }, [data.bands, years]);
 
   const maPoints = useMemo(
