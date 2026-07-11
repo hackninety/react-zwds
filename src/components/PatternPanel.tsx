@@ -4,7 +4,7 @@ import { scanHoroscopePatterns } from "../core/analysis";
 
 /**
  * 格局·古籍语料面板（拨盘之下、人生K线之上）：
- * 本命格局卡片（构成/释义/古籍赋文出处/成格瑕疵）+ 当前大限/流年运限格局（随拨盘联动）。
+ * 本命格局卡片（构成/释义/古籍赋文出处/成格瑕疵）+ 当前大限/流年/流月运限格局（随拨盘联动）。
  */
 export function PatternPanel({ z }: { z: Zwds }) {
   const a = z.astrolabe;
@@ -18,6 +18,7 @@ export function PatternPanel({ z }: { z: Zwds }) {
 
   if (!a || !an) return null;
   const dec = z.activeDecadeIdx >= 0 ? z.decades[z.activeDecadeIdx] : null;
+  const monthCell = z.months.find((m) => m.month === z.pick.month && m.leap === z.effLeap);
 
   const horoRows = horoPats
     ? ([
@@ -30,6 +31,11 @@ export function PatternPanel({ z }: { z: Zwds }) {
           key: "yearly",
           label: `流年 ${z.pick.year}${h ? ` ${h.yearly.heavenlyStem}${h.yearly.earthlyBranch}` : ""}`,
           list: horoPats.yearly,
+        },
+        {
+          key: "monthly",
+          label: `流月 ${monthCell?.label ?? `${z.pick.month}月`}${h ? ` ${h.monthly.heavenlyStem}${h.monthly.earthlyBranch}` : ""}`,
+          list: horoPats.monthly,
         },
       ] as const)
     : [];

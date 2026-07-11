@@ -9,6 +9,8 @@ import { lunarToSolarStr } from "./lunar";
 import { encode as toonEncode } from "@toon-format/toon";
 import {
   analyzeChart,
+  buildChartIndex,
+  detectHoroscopePatterns,
   scanHoroscopePatterns,
   type ChartAnalysis,
   type HoroPattern,
@@ -74,22 +76,32 @@ function getAllDecadals(z: Zwds) {
   return results;
 }
 
-/** 当前流年的流月一览（含闰月位） */
+/** 当前流年的流月一览（含闰月位、逐月格局扫描） */
 function getMonthlyOfYear(z: Zwds) {
   const { astrolabe, pick, months } = z;
   if (!astrolabe) return [];
+  const ix = buildChartIndex(astrolabe); // 十二流月共享一份索引
   const results: Record<string, unknown>[] = [];
   for (const cell of months) {
     const dateStr = lunarToSolarStr(pick.year, cell.month, 15, cell.leap);
     if (!dateStr) continue;
     try {
       const h = astrolabe.horoscope(dateStr, 0);
+      const pats = detectHoroscopePatterns(
+        astrolabe,
+        "monthly",
+        h.monthly.index,
+        h.monthly.heavenlyStem as string,
+        h.monthly.earthlyBranch as string,
+        ix
+      );
       results.push({
         month: cell.month,
         isLeapMonth: cell.leap,
         label: cell.label,
         ganZhi: cell.gz,
         ...serializeHoroscopeItem(h.monthly),
+        patterns: pats.map((p) => `${p.name}(${p.kind})`),
       });
     } catch {
       /* skip */
@@ -109,8 +121,10 @@ function schoolLabel(algorithm: string): string {
     : "南派三合（《紫微斗数全书》通行版）";
 }
 
-/** 当前大限+流年的运限格局扫描（以运限命宫三方为中心，与盘面面板共用入口） */
-function horoscopePatternsOf(z: Zwds): { decadal: HoroPattern[]; yearly: HoroPattern[] } | null {
+/** 当前大限+流年+流月的运限格局扫描（以运限命宫三方为中心，与盘面面板共用入口） */
+function horoscopePatternsOf(
+  z: Zwds
+): { decadal: HoroPattern[]; yearly: HoroPattern[]; monthly: HoroPattern[] } | null {
   const a = z.astrolabe;
   const h = z.horoscope;
   if (!a || !h) return null;
@@ -654,13 +668,14 @@ export function buildExportMd(z: Zwds): string | null {
   if (my.length) {
     L.push(`## 八、${z.pick.year} 年十二流月总览`);
     L.push("");
-    L.push(`| 流月 | 干支 | 流月命宫落宫 | 四化（禄/权/科/忌） |`);
-    L.push(`|---|---|---|---|`);
+    L.push(`| 流月 | 干支 | 流月命宫落宫 | 四化（禄/权/科/忌） | 格局提示 |`);
+    L.push(`|---|---|---|---|---|`);
     for (const m of my) {
       const idx = m.index as number;
       const seat = a.palaces[idx];
+      const pats = (m.patterns as string[]) ?? [];
       L.push(
-        `| ${m.label} | ${m.ganZhi} | ${seat?.name}（${seat?.earthlyBranch}） | ${(m.mutagen as string[]).join(" / ")} |`
+        `| ${m.label} | ${m.ganZhi} | ${seat?.name}（${seat?.earthlyBranch}） | ${(m.mutagen as string[]).join(" / ")} | ${pats.join("、") || "—"} |`
       );
     }
     L.push("");

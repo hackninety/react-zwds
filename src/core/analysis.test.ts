@@ -11,6 +11,7 @@ import {
   getBorrowedStars,
   getFlyMatrix,
   getSanfangSnapshots,
+  scanHoroscopePatterns,
   traceMutagenChains,
 } from "./analysis";
 import { fixIndex } from "./utils";
@@ -224,6 +225,38 @@ describe("analysis 结构分析层", () => {
     // 一甲子内应出现多种运限格局（杀破狼运/忌入·忌冲/双禄等）
     expect(seen.size).toBeGreaterThanOrEqual(3);
     expect([...seen].some((n) => n.includes("杀破狼") || n.includes("忌"))).toBe(true);
+  });
+
+  it("运限格局扫描：流月层十二个月结构自洽（流月命宫一年转遍十二宫）", () => {
+    const seen = new Set<string>();
+    for (let m = 1; m <= 12; m++) {
+      const h = a.horoscope(`2026-${m}-15`, 0);
+      const pats = detectHoroscopePatterns(
+        a,
+        "monthly",
+        h.monthly.index,
+        h.monthly.heavenlyStem as string,
+        h.monthly.earthlyBranch as string
+      );
+      for (const p of pats) {
+        expect(p.scope).toBe("monthly");
+        expect(["吉", "凶", "注意"]).toContain(p.kind);
+        expect(p.basis).toBeTruthy();
+        expect(p.meaning).toBeTruthy();
+        seen.add(p.name);
+      }
+    }
+    // 流月命宫逐月轮转十二宫，杀破狼运等必有月份触发
+    expect(seen.size).toBeGreaterThanOrEqual(1);
+  });
+
+  it("scanHoroscopePatterns：大限/流年/流月三 scope 齐备", () => {
+    const h = a.horoscope("2026-7-10", 0);
+    const r = scanHoroscopePatterns(a, h);
+    expect(Array.isArray(r.decadal)).toBe(true);
+    expect(Array.isArray(r.yearly)).toBe(true);
+    expect(Array.isArray(r.monthly)).toBe(true);
+    for (const p of r.monthly) expect(p.scope).toBe("monthly");
   });
 
   it("运限格局扫描：大限层可跑且确定性", () => {

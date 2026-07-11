@@ -1949,6 +1949,7 @@ body {
 
 .pat-scope-decadal { color: var(--c-decadal); border-color: rgba(46, 230, 200, 0.45); }
 .pat-scope-yearly { color: var(--c-yearly); border-color: rgba(91, 160, 255, 0.5); }
+.pat-scope-monthly { color: var(--c-monthly); border-color: rgba(255, 161, 78, 0.5); }
 
 .pat-horo-items p {
   margin: 2px 0;

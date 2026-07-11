@@ -142,6 +142,8 @@ describe("exportData 导出构建器", () => {
     expect(md).toContain("### 四化传导链（两转三转）");
     expect(md).toContain("- **忌链**（十二宫为链首）：");
     expect(md).toContain("- **禄链**（十二宫为链首）：");
+    // 第八节流月表的格局提示列
+    expect(md).toContain("| 格局提示 |");
   });
 
   it("TOON：可解码往返，剥离知识附录且 meta 注明", () => {
@@ -155,7 +157,9 @@ describe("exportData 导出构建器", () => {
     expect((parsed.palaces as unknown[]).length).toBe(12);
     expect((parsed.decadePlan as unknown[]).length).toBe(12);
     const horo = parsed.horoscope as Record<string, unknown>;
-    expect(horo.horoscopePatterns).toBeTruthy();
+    const hp = horo.horoscopePatterns as Record<string, unknown>;
+    expect(hp).toBeTruthy();
+    expect(Array.isArray(hp.monthly)).toBe(true);
   });
 
   it("AI 载荷：指引 + toon 代码块 + 附录A/C/D 全在", () => {
@@ -192,6 +196,12 @@ describe("exportData 导出构建器", () => {
     const chains = an.mutagenChains as { ji: unknown[]; lu: unknown[] };
     expect(chains.ji).toHaveLength(12);
     expect(chains.lu).toHaveLength(12);
+    const horo = data.horoscope as Record<string, unknown>;
+    const hp = horo.horoscopePatterns as Record<string, unknown>;
+    expect(Array.isArray(hp.monthly)).toBe(true);
+    const rows = horo.monthlyOfCurrentYear as Record<string, unknown>[];
+    expect(rows.length).toBeGreaterThanOrEqual(12);
+    for (const r of rows) expect(Array.isArray(r.patterns)).toBe(true);
   });
 
   it("确定性：剔除时间戳后两次构建一致", () => {

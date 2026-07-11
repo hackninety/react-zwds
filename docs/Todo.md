@@ -15,11 +15,12 @@
 + 宫位弹层（本宫链首两行）。测试：链路自洽不变量/演示盘已知链路/回头样例盘
 + PalaceDetail renderToString 渲染冒烟（组件层测试第一例，D2 的起点）。
 
-### A2. 流月运限格局扫描　P1 · 小中
-`patterns.ts detectHoroscopePatterns` 的 scope 只有 `decadal | yearly`（patterns.ts:636），
-流月缺位——但流月干支、流月曜（`getHoroscopeStar` monthly）全都现成。
-- 扩 scope 为 `monthly`，`scanHoroscopePatterns` 增加第三路；羊陀夹忌/忌冲命等格局定应期**到月**。
-- 落点：PatternPanel 增加"流月"行（随拨盘联动）；导出 MD 第八节流月表加格局列；TOON/JSON 的 horoscopePatterns 加 monthly。
+### ~~A2. 流月运限格局扫描~~　✅ 已完成（2026-07-11）
+detectHoroscopePatterns scope 扩为 `monthly`（月干四化+月曜，前缀映射运/流/月并顺手修正
+大限层「大昌」误称）；scanHoroscopePatterns 三路齐扫。出口：PatternPanel 流月行（随拨盘
+联动，含闰月标签）、MD 第八节流月表「格局提示」列（十二个月逐月扫描）、JSON/TOON 的
+horoscopePatterns.monthly + monthlyOfCurrentYear 每行 patterns。演示盘 2026 年活检：
+八类格局全有月份触发（4月羊陀夹忌/9月阳梁昌禄考运窗口/3·6·8月禄马交驰）。
 
 ### A3. 知识库续编（《紫微斗数全书》余篇）　P1 · 中　★原候选
 docs/kb 已收 14 篇，尚缺全书内以下公版篇目（同为明清传本，与已收各篇同源无版权问题）：

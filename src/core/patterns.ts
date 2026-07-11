@@ -630,10 +630,10 @@ export function detectPatterns(a: Astrolabe, ix: ChartIndex = buildChartIndex(a)
   return out;
 }
 
-/* ─────────────── 运限格局扫描（大限/流年层） ─────────────── */
+/* ─────────────── 运限格局扫描（大限/流年/流月层） ─────────────── */
 
 export type HoroPattern = {
-  scope: "decadal" | "yearly";
+  scope: "decadal" | "yearly" | "monthly";
   name: string;
   kind: "吉" | "凶" | "注意";
   basis: string;
@@ -642,14 +642,14 @@ export type HoroPattern = {
 
 /**
  * 以运限命宫为中心扫描运限层格局：本命星曜三方会照 + 该运限四化引动 + 该运限流曜。
- * 用于回答「这个大限/这一年是不是考运年/财运年/动荡年」。
+ * 用于回答「这个大限/这一年/这个月是不是考运期/财运期/动荡期」。
  *
- * @param soulIdxOfScope 运限命宫所在的本命宫位索引（h.decadal.index / h.yearly.index）
+ * @param soulIdxOfScope 运限命宫所在的本命宫位索引（h.decadal.index / h.yearly.index / h.monthly.index）
  * @param stem/branch    运限干支（四化与流曜由此起）
  */
 export function detectHoroscopePatterns(
   a: Astrolabe,
-  scope: "decadal" | "yearly",
+  scope: "decadal" | "yearly" | "monthly",
   soulIdxOfScope: number,
   stem: string,
   branch: string,
@@ -659,7 +659,9 @@ export function detectHoroscopePatterns(
   const sf = sanfangIdx(S);
   const sfSet = new Set(sf);
   const sfStars = new Set<string>(sf.flatMap((q) => starNamesAt(a, q)));
-  const tag = scope === "decadal" ? "大限" : "流年";
+  const tag = scope === "decadal" ? "大限" : scope === "yearly" ? "流年" : "流月";
+  /* 流曜名前缀随层级（iztro 实名：运昌/流昌/月昌） */
+  const fp = scope === "decadal" ? "运" : scope === "yearly" ? "流" : "月";
   const out: HoroPattern[] = [];
   const add = (name: string, kind: HoroPattern["kind"], basis: string, meaning: string) =>
     out.push({ scope, name, kind, basis, meaning });
@@ -714,7 +716,7 @@ export function detectHoroscopePatterns(
     add(
       "阳梁昌禄（运限）",
       "吉",
-      `太阳、天梁会${tag}命宫三方，文昌${sfStars.has("文昌") ? "" : `（${tag[0]}昌）`}与禄俱到`,
+      `太阳、天梁会${tag}命宫三方，文昌${sfStars.has("文昌") ? "" : `（${fp}昌）`}与禄俱到`,
       "考试功名应期：升学、考证、竞聘、体制晋升的窗口期"
     );
   }
@@ -727,7 +729,7 @@ export function detectHoroscopePatterns(
       add(
         "禄马交驰（运限）",
         "吉",
-        `禄（${flowIn("禄") ? `${tag[0]}禄` : mutInSf(0) ? `化禄${mutStars[0]}` : "禄存"}）与马（${flowIn("马") ? `${tag[0]}马` : "天马"}）同会${tag}命宫三方`,
+        `禄（${flowIn("禄") ? `${fp}禄` : mutInSf(0) ? `化禄${mutStars[0]}` : "禄存"}）与马（${flowIn("马") ? `${fp}马` : "天马"}）同会${tag}命宫三方`,
         "动中得财之运，宜外出经营、差旅开拓、异地机会"
       );
     }
@@ -803,14 +805,15 @@ export function detectHoroscopePatterns(
 }
 
 
-/** 当前大限+流年双 scope 一次扫描（共享索引）：导出与盘面格局面板共用入口 */
+/** 当前大限+流年+流月三 scope 一次扫描（共享索引）：导出与盘面格局面板共用入口 */
 export function scanHoroscopePatterns(
   a: Astrolabe,
   h: {
     decadal: { index: number; heavenlyStem: unknown; earthlyBranch: unknown };
     yearly: { index: number; heavenlyStem: unknown; earthlyBranch: unknown };
+    monthly?: { index: number; heavenlyStem: unknown; earthlyBranch: unknown };
   }
-): { decadal: HoroPattern[]; yearly: HoroPattern[] } {
+): { decadal: HoroPattern[]; yearly: HoroPattern[]; monthly: HoroPattern[] } {
   const ix = buildChartIndex(a);
   return {
     decadal: detectHoroscopePatterns(
@@ -829,5 +832,15 @@ export function scanHoroscopePatterns(
       h.yearly.earthlyBranch as string,
       ix
     ),
+    monthly: h.monthly
+      ? detectHoroscopePatterns(
+          a,
+          "monthly",
+          h.monthly.index,
+          h.monthly.heavenlyStem as string,
+          h.monthly.earthlyBranch as string,
+          ix
+        )
+      : [],
   };
 }
