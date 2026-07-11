@@ -49,6 +49,9 @@ describe("exportData 导出构建器", () => {
     expect(md).toContain("- **禄链**（十二宫为链首）：");
     // 第八节流月表的格局提示列
     expect(md).toContain("| 格局提示 |");
+    // 附录A 命主身主诠释节（与第一节的命主/身主行呼应）
+    expect(md).toContain("| 命主 / 身主 |");
+    expect(md).toContain("### H. 命主身主");
   });
 
   it("TOON：可解码往返，剥离知识附录且 meta 注明", () => {
