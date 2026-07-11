@@ -1,7 +1,7 @@
 /**
  * 结构分析层：把斗数推理中「机械且 AI 最易出错」的中间步骤确定性算好，
  * 供导出直接引用 —— 三方四正快照、飞宫四化全矩阵（含离心/向心自化）、
- * 夹宫关系、空宫借星；格局检测在 patterns.ts（此处聚合再导出）。
+ * 四化传导链（禄忌两转三转）、夹宫关系、空宫借星；格局检测在 patterns.ts（此处聚合再导出）。
  *
  * 全部只读本命盘（Astrolabe），不依赖运限状态；四化表跟随 iztro 全局配置。
  * 各函数接受可选共享索引（analyzeChart 整盘建一次向下传），默认自建。
@@ -267,6 +267,102 @@ export function getJiaGong(a: Astrolabe, ix: ChartIndex = buildChartIndex(a)): J
   return out;
 }
 
+/* ─────────────── 五、四化传导链（禄忌两转三转） ─────────────── */
+
+export type ChainStep = {
+  fromIndex: number;
+  fromName: string;
+  /** 出发宫宫干 */
+  stem: string;
+  /** 化出之星 */
+  star: string;
+  toIndex: number;
+  toName: string;
+  /** 星就坐出发宫（离心自化），链在此泄出 */
+  isSelf: boolean;
+  /** 出发宫的禄星与忌星俱入同一宫（禄忌同途，吉中藏耗） */
+  luJiTogether: boolean;
+};
+
+export type MutagenChain = {
+  kind: "禄" | "忌";
+  headIndex: number;
+  headName: string;
+  steps: ChainStep[];
+  /** 终止方式：自化=泄出 / 回头=缠回链首 / 成环=链中互缠 / 三转止=达步数上限 */
+  end: "自化" | "回头" | "成环" | "三转止";
+  /** 链路一句话（可直接展示/导出） */
+  text: string;
+};
+
+export type MutagenChains = {
+  ji: MutagenChain[];
+  lu: MutagenChain[];
+  note: string;
+};
+
+/** 两转三转：链最多走三步（链首起飞 + 再转两次） */
+const CHAIN_HOPS = 3;
+
+function traceOne(a: Astrolabe, ix: ChartIndex, head: number, kind: "禄" | "忌"): MutagenChain {
+  const kIdx = kind === "禄" ? 0 : 3;
+  const steps: ChainStep[] = [];
+  const visited = [head];
+  let cur = head;
+  let end: MutagenChain["end"] = "三转止";
+  for (let hop = 0; hop < CHAIN_HOPS; hop++) {
+    const p = a.palaces[cur];
+    const table = util.getMutagensByHeavenlyStem(p.heavenlyStem as never) as string[];
+    const star = table[kIdx];
+    const to = ix.pos.get(star);
+    if (to === undefined) break; // 防御：四化星理论上必在盘中
+    const luTo = ix.pos.get(table[0]);
+    const isSelf = to === cur;
+    steps.push({
+      fromIndex: cur,
+      fromName: p.name,
+      stem: p.heavenlyStem as string,
+      star,
+      toIndex: to,
+      toName: a.palaces[to].name,
+      isSelf,
+      luJiTogether: luTo !== undefined && luTo === ix.pos.get(table[3]),
+    });
+    if (isSelf) {
+      end = "自化";
+      break;
+    }
+    if (to === head) {
+      end = "回头";
+      break;
+    }
+    if (visited.includes(to)) {
+      end = "成环";
+      break;
+    }
+    visited.push(to);
+    cur = to;
+  }
+  const text =
+    steps
+      .map(
+        (s) =>
+          `${s.fromName}(${s.stem})${s.star}${kind}入${s.isSelf ? "本宫" : s.toName}${
+            s.luJiTogether ? "（禄忌同途）" : ""
+          }`
+      )
+      .join(" → ") + `【${end === "自化" ? `自化${kind}` : end}】`;
+  return { kind, headIndex: head, headName: a.palaces[head].name, steps, end, text };
+}
+
+export function traceMutagenChains(a: Astrolabe, ix: ChartIndex = buildChartIndex(a)): MutagenChains {
+  return {
+    ji: a.palaces.map((p) => traceOne(a, ix, p.index, "忌")),
+    lu: a.palaces.map((p) => traceOne(a, ix, p.index, "禄")),
+    note: "宫干四化逐级串联（最多三转，遇自化/回头/成环即止）：忌链=破耗与责任的传导路径，链尾宫为最终沉淀处；禄链=福泽输送路径，看福最终归于何事。【自化X】=链在该宫泄出不聚；【回头】=缠回链首宫（因果回身）；【成环】=链中两宫互缠；（禄忌同途）=该宫禄忌俱入同一宫，吉中藏耗。",
+  };
+}
+
 /* ─────────────── 汇总入口 ─────────────── */
 
 export type ChartAnalysis = {
@@ -274,17 +370,19 @@ export type ChartAnalysis = {
   patterns: Pattern[];
   sanfang: SanfangSnapshot[];
   flyMatrix: FlyMatrix;
+  mutagenChains: MutagenChains;
   jiaGong: JiaGong[];
   borrowed: BorrowedInfo[];
 };
 
 export function analyzeChart(a: Astrolabe): ChartAnalysis {
-  const ix = buildChartIndex(a); // 整盘建一次索引，五个分析共享
+  const ix = buildChartIndex(a); // 整盘建一次索引，六个分析共享
   return {
-    note: "本节为确定性结构分析（与安星/四化同一口径算出）：patterns=格局检测（含成格瑕疵与古籍出处）；sanfang=每宫三方四正快照（会吉/会煞/四化会入已汇总，无需再数宫位）；flyMatrix=十二宫宫干四化飞宫全矩阵（含离心/向心自化）；jiaGong=夹宫关系；borrowed=空宫借星。分析时请直接引用本节结论。",
+    note: "本节为确定性结构分析（与安星/四化同一口径算出）：patterns=格局检测（含成格瑕疵与古籍出处）；sanfang=每宫三方四正快照（会吉/会煞/四化会入已汇总，无需再数宫位）；flyMatrix=十二宫宫干四化飞宫全矩阵（含离心/向心自化）；mutagenChains=禄忌传导链（宫干四化逐级串联两转三转）；jiaGong=夹宫关系；borrowed=空宫借星。分析时请直接引用本节结论。",
     patterns: detectPatterns(a, ix),
     sanfang: getSanfangSnapshots(a, ix),
     flyMatrix: getFlyMatrix(a, ix),
+    mutagenChains: traceMutagenChains(a, ix),
     jiaGong: getJiaGong(a, ix),
     borrowed: getBorrowedStars(a, ix),
   };

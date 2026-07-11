@@ -11,6 +11,7 @@ import {
   getBorrowedStars,
   getFlyMatrix,
   getSanfangSnapshots,
+  traceMutagenChains,
 } from "./analysis";
 import { fixIndex } from "./utils";
 
@@ -77,6 +78,65 @@ describe("analysis 结构分析层", () => {
       // 向心自化 = 对宫飞入本宫
       const opp = fm.palaces.find((x) => x.palaceIndex === fixIndex(pf.palaceIndex + 6))!;
       expect(pf.selfInward.length).toBe(opp.flies.filter((f) => f.toIndex === pf.palaceIndex).length);
+    }
+  });
+
+  it("四化传导链：链路自洽（连续性/落宫与星位一致/终止方式/与飞宫矩阵同源）", () => {
+    const mc = traceMutagenChains(a);
+    const fm = getFlyMatrix(a);
+    const pos = new Map<string, number>();
+    for (const p of a.palaces) {
+      for (const st of [...p.majorStars, ...p.minorStars]) pos.set(st.name as string, p.index);
+    }
+    for (const list of [mc.ji, mc.lu]) {
+      expect(list).toHaveLength(12);
+      for (const c of list) {
+        expect(c.steps.length).toBeGreaterThanOrEqual(1);
+        expect(c.steps.length).toBeLessThanOrEqual(3);
+        expect(["自化", "回头", "成环", "三转止"]).toContain(c.end);
+        expect(c.steps[0].fromIndex).toBe(c.headIndex);
+        c.steps.forEach((s, i) => {
+          // 落宫与星的实际位置一致；星确为该宫干对应之化
+          expect(pos.get(s.star)).toBe(s.toIndex);
+          const table = util.getMutagensByHeavenlyStem(s.stem as never) as string[];
+          expect(s.star).toBe(table[c.kind === "禄" ? 0 : 3]);
+          // 连续性：上一步落宫 = 下一步出发宫
+          if (i > 0) expect(s.fromIndex).toBe(c.steps[i - 1].toIndex);
+          expect(s.isSelf).toBe(s.toIndex === s.fromIndex);
+        });
+        const last = c.steps[c.steps.length - 1];
+        if (c.end === "自化") expect(last.isSelf).toBe(true);
+        if (c.end === "回头") expect(last.toIndex).toBe(c.headIndex);
+        // 首步与飞宫矩阵同一口径
+        const pf = fm.palaces.find((x) => x.palaceIndex === c.headIndex)!;
+        const f = pf.flies[c.kind === "禄" ? 0 : 3];
+        expect(c.steps[0].star).toBe(f.star);
+        expect(c.steps[0].toIndex).toBe(f.toIndex);
+      }
+    }
+  });
+
+  it("四化传导链：演示盘已知链路（三转止/自化终止）", () => {
+    const mc = traceMutagenChains(a);
+    const idxOf = (name: string) => a.palaces.findIndex((p) => p.name === name);
+    expect(mc.ji.find((c) => c.headIndex === idxOf("命宫"))!.text).toBe(
+      "命宫(壬)武曲忌入财帛 → 财帛(戊)天机忌入兄弟 → 兄弟(辛)文昌忌入福德【三转止】"
+    );
+    const guanJi = mc.ji.find((c) => c.headIndex === idxOf("官禄"))!;
+    expect(guanJi.text).toBe("官禄(丙)廉贞忌入本宫【自化忌】");
+    expect(guanJi.end).toBe("自化");
+    expect(mc.lu.find((c) => c.headIndex === idxOf("迁移"))!.text).toBe(
+      "迁移(戊)贪狼禄入本宫【自化禄】"
+    );
+  });
+
+  it("四化传导链：回头链样例（忌链缠回链首宫）", () => {
+    const c84 = makeChart("1984-03-15", 0, "男");
+    const backs = traceMutagenChains(c84).ji.filter((c) => c.end === "回头");
+    expect(backs.length).toBeGreaterThanOrEqual(3);
+    for (const c of backs) {
+      expect(c.steps[c.steps.length - 1].toIndex).toBe(c.headIndex);
+      expect(c.text).toContain("【回头】");
     }
   });
 

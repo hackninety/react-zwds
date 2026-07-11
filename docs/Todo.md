@@ -8,12 +8,12 @@
 
 ## A. AI 推理主线
 
-### A1. 四化传导链（禄忌的来处与去处）　P1 · 中
-飞宫矩阵（`analysis.ts getFlyMatrix`）目前只有 12×4 的单跳全表，没有**串联**：
-命宫（宫干）化忌入 A 宫 → A 宫干再化忌入 B 宫 →（两转、三转，带环检测）。
-- 忌链 = 破耗传导路径；禄链 = 福泽输送路径（禄随忌走时标注"禄忌同途"）。
-- 落点：`analysis.ts` 新增 `traceMutagenChains(a, ix)`；导出 MD 第五节追加"传导链"小节；`PalaceDetail.tsx` 弹层展示本宫为链首的链。
-- 属飞星派技法，纯宫干推导、确定性强，与既有矩阵同源，无口径风险。
+### ~~A1. 四化传导链（禄忌的来处与去处）~~　✅ 已完成（2026-07-11）
+`analysis.ts traceMutagenChains(a, ix)`：十二宫为链首各追忌链/禄链，最多三转，
+终止方式=自化（泄出）/回头（缠回链首）/成环（链中互缠）/三转止；步级标注禄忌同途。
+已进 analyzeChart（JSON/TOON 的 analysis.mutagenChains）+ MD 第五节"传导链"小节
++ 宫位弹层（本宫链首两行）。测试：链路自洽不变量/演示盘已知链路/回头样例盘
++ PalaceDetail renderToString 渲染冒烟（组件层测试第一例，D2 的起点）。
 
 ### A2. 流月运限格局扫描　P1 · 小中
 `patterns.ts detectHoroscopePatterns` 的 scope 只有 `decadal | yearly`（patterns.ts:636），

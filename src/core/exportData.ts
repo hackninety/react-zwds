@@ -140,7 +140,7 @@ export function buildExportData(z: Zwds) {
     ),
     dayDivide: z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日",
     exportedAt: new Date().toISOString(),
-    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。",
+    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/四化传导链/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。",
   };
 
   const input = {
@@ -463,6 +463,16 @@ function flyMatrixMd(an: ChartAnalysis): string[] {
   if (inward.length) {
     L.push(`- **向心自化汇总**：${inward.map((p) => `${p.palaceName}(${p.selfInward.join("、")})`).join("；")}`);
   }
+  L.push("");
+  const mc = an.mutagenChains;
+  L.push(`### 四化传导链（两转三转）`);
+  L.push("");
+  L.push(`> ${mc.note}`);
+  L.push("");
+  L.push(`- **忌链**（十二宫为链首）：`);
+  for (const c of mc.ji) L.push(`  - ${c.text}`);
+  L.push(`- **禄链**（十二宫为链首）：`);
+  for (const c of mc.lu) L.push(`  - ${c.text}`);
   L.push("");
   return L;
 }

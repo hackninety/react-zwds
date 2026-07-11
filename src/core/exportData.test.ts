@@ -138,6 +138,10 @@ describe("exportData 导出构建器", () => {
     expect(md).toContain("### 运限格局提示");
     expect(md).toContain("逐月细化（月K线）");
     expect(md).toContain("| 大限(虚岁) |");
+    // 第五节的传导链小节
+    expect(md).toContain("### 四化传导链（两转三转）");
+    expect(md).toContain("- **忌链**（十二宫为链首）：");
+    expect(md).toContain("- **禄链**（十二宫为链首）：");
   });
 
   it("TOON：可解码往返，剥离知识附录且 meta 注明", () => {
@@ -184,6 +188,10 @@ describe("exportData 导出构建器", () => {
     const lk = data.lifeKline as Record<string, unknown>;
     const monthly = lk.monthlyOfSelectedYear as Record<string, unknown>;
     expect((monthly.domains as unknown[]).length).toBe(12);
+    const an = data.analysis as Record<string, unknown>;
+    const chains = an.mutagenChains as { ji: unknown[]; lu: unknown[] };
+    expect(chains.ji).toHaveLength(12);
+    expect(chains.lu).toHaveLength(12);
   });
 
   it("确定性：剔除时间戳后两次构建一致", () => {

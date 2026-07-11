@@ -28,6 +28,8 @@ export function PalaceDetail({
 
   const snap = an.sanfang.find((s) => s.palaceIndex === index);
   const fly = an.flyMatrix.palaces.find((p) => p.palaceIndex === index);
+  const jiChain = an.mutagenChains.ji.find((c) => c.headIndex === index);
+  const luChain = an.mutagenChains.lu.find((c) => c.headIndex === index);
   const jia = an.jiaGong.filter((j) => j.palaceIndex === index);
   // 该宫格局；全盘级格局（如日月反背，where 不以任何宫名开头）兜底归入命宫弹层
   const patterns = an.patterns.filter((p) => {
@@ -108,6 +110,24 @@ export function PalaceDetail({
             </ul>
             {fly.selfInward.length > 0 && (
               <p className="pd-inward">向心自化：{fly.selfInward.join("、")}</p>
+            )}
+          </section>
+        )}
+
+        {(jiChain || luChain) && (
+          <section>
+            <h4>四化传导链（本宫为链首，两转三转）</h4>
+            {jiChain && (
+              <p className="pd-chain pd-chain-ji">
+                <i>忌链</i>
+                {jiChain.text}
+              </p>
+            )}
+            {luChain && (
+              <p className="pd-chain pd-chain-lu">
+                <i>禄链</i>
+                {luChain.text}
+              </p>
             )}
           </section>
         )}

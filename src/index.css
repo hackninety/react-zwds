@@ -1479,6 +1479,30 @@ body {
 
 .pd-inward { margin: 6px 0 0; color: var(--dim); font-size: 0.74rem; }
 
+/* 四化传导链（弹层） */
+.pd-chain {
+  margin: 4px 0;
+  padding: 5px 8px 5px 10px;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  color: var(--dim);
+  border-left: 2px solid var(--faint);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 6px 6px 0;
+}
+.pd-chain i {
+  font-style: normal;
+  font-size: 0.68rem;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: #05070f;
+}
+.pd-chain-ji { border-left-color: var(--m-ji); }
+.pd-chain-ji i { background: var(--m-ji); color: #fff; }
+.pd-chain-lu { border-left-color: var(--m-lu); }
+.pd-chain-lu i { background: var(--m-lu); }
+
 .pd-pattern { margin-bottom: 8px; }
 .pd-pattern b { color: var(--text); }
 .pd-pattern p { margin: 2px 0; color: var(--dim); line-height: 1.5; }
