@@ -154,11 +154,24 @@ export function detectPatterns(a: Astrolabe, ix: ChartIndex = buildChartIndex(a)
     });
   }
   if (["卯", "酉"].includes(soulBranch) && soulMajors.has("巨门") && soulMajors.has("天机")) {
-    addSoulGood({
-      name: "巨机同临",
-      basis: `巨门、天机同守命于${soulBranch}`,
-      meaning: "口才机变出众，卯宫为佳（巨机居卯格），利言语/企划/传播",
-    });
+    if (soulBranch === "卯") {
+      addSoulGood({
+        name: "巨机同临",
+        basis: "巨门、天机同守命于卯（巨机居卯）",
+        meaning: "口才机变出众，利言语/企划/传播",
+        classic: "「巨機同宮，公卿之位」——《紫微斗数全书·骨髓赋》",
+      });
+    } else {
+      const hua = ["巨门", "天机"].filter((s) => ix.natal.slice(0, 3).includes(s));
+      add({
+        name: "巨机化酉",
+        kind: "注意",
+        where: soulWhere,
+        basis: `巨门、天机同守命于酉${hua.length ? `，${hua.join("、")}逢生年吉化` : ""}`,
+        meaning: "巨机居酉为弱地，纵得禄权科亦难大贵，宜专业深耕、忌好高骛远",
+        classic: "「巨機酉上化吉者，縱遇財官也不榮」——《紫微斗数全书·骨髓赋》",
+      });
+    }
   }
   if (["寅", "申"].includes(soulBranch) && soulMajors.has("巨门") && soulMajors.has("太阳")) {
     addSoulGood({
@@ -624,6 +637,118 @@ export function detectPatterns(a: Astrolabe, ix: ChartIndex = buildChartIndex(a)
         meaning: "名与权对拱，利考试晋升、名位相济",
         classic: "「科权对拱，跃三汲于禹门」——《紫微斗数全书·骨髓赋》",
       });
+    }
+  }
+
+  /* —— 格局三期（A4，出处见 docs/kb 赋文库 15~20 与骨髓赋） —— */
+
+  // 极向离明：紫微守命于午
+  soulSeat("紫微", ["午"], {
+    name: "极向离明",
+    basis: "紫微守命于午（帝星临离明之位）",
+    meaning: "帝座极旺之贵格，无煞凑者贵显，宜掌权柄任要职",
+    classic: "「紫微居午無殺湊，位至公卿」——《紫微斗数全书·骨髓赋》",
+  });
+
+  // （火贪格/铃贪格已有全盘检索版，见上方「火贪/铃贪」段，不重复检测）
+
+  // 禄合鸳鸯：禄存与生年化禄星同守命宫
+  if (luStar && soulAll.has("禄存") && soulAll.has(luStar)) {
+    addSoulGood({
+      name: "禄合鸳鸯",
+      basis: `禄存与生年化禄星${luStar}同守命宫（${soulBranch}）`,
+      meaning: "双禄同宫如鸳鸯并栖，一生财禄丰盈、遇难有解",
+      classic: "「合祿鴛鴦一世榮」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  // 财禄夹马：天马守命，武曲与禄存分居两邻相夹
+  if (
+    soulAll.has("天马") &&
+    ((prevSet.has("武曲") && nextSet.has("禄存")) || (prevSet.has("禄存") && nextSet.has("武曲")))
+  ) {
+    addSoulGood({
+      name: "财禄夹马",
+      basis: `天马守命（${soulBranch}），武曲、禄存分居两邻相夹`,
+      meaning: "财星禄星夹驿马，动中进财、越动越发，宜经商贸易/外勤开拓",
+      classic: "「財祿夾馬，馬守命，武祿來夾是也，逢生旺尤妙」——《紫微斗数全书·定富局》",
+    });
+  }
+
+  // 月生沧海：太阴在子宫守田宅（田宅富局，不以命宫论）
+  {
+    const tian = a.palaces.find((p) => (p.name as string) === "田宅");
+    if (
+      tian &&
+      (tian.earthlyBranch as string) === "子" &&
+      tian.majorStars.some((s) => (s.name as string) === "太阴")
+    ) {
+      add({
+        name: "月生沧海",
+        kind: "吉",
+        where: "田宅(子)",
+        basis: "太阴入庙于子宫，守田宅",
+        meaning: "月照江海、财库明润：不动产与家业丰厚，宜置产守成",
+        classic: "「月生滄海，月在子宮守田宅是也」——《紫微斗数全书·定貴局》",
+      });
+    }
+  }
+
+  // 铃昌陀武：铃星文昌陀罗武曲四星交会于辰戌三方（本命结构，行限引动最凶）
+  for (const br of ["辰", "戌"] as const) {
+    const P = a.palaces.findIndex((p) => (p.earthlyBranch as string) === br);
+    if (P < 0) continue;
+    const stars = new Set(sanfangIdx(P).flatMap((q) => starNamesAt(a, q)));
+    if (["铃星", "文昌", "陀罗", "武曲"].every((s) => stars.has(s))) {
+      add({
+        name: "铃昌陀武",
+        kind: "凶",
+        where: pName(P),
+        basis: `铃星、文昌、陀罗、武曲四星交会于${br}宫三方四正`,
+        meaning: "本命藏此凶会结构：大限流年行至辰戌引动时防重大挫败与水厄意外，须提前避险",
+        classic: "「鈴昌陀武，限至投河」——《紫微斗数全书·骨髓赋》",
+      });
+      break; // 辰戌互为对宫、三方重叠，报一次即可
+    }
+  }
+
+  // 廉贞七杀同位：同守命宫（丑未），加煞忌则凶
+  if (soulMajors.has("廉贞") && soulMajors.has("七杀")) {
+    const sha = ["擎羊", "陀罗", "火星", "铃星"].filter((s) => soulAll.has(s));
+    const withJi = !!jiStar && soulAll.has(jiStar);
+    const bad = sha.length > 0 || withJi;
+    add({
+      name: "廉贞七杀",
+      kind: bad ? "凶" : "注意",
+      where: soulWhere,
+      basis: `廉贞、七杀同守命宫（${soulBranch}）${sha.length ? `，加${sha.join("、")}` : ""}${withJi ? `，${jiStar}化忌同宫` : ""}`,
+      meaning: bad
+        ? "囚星将星凶会再逢煞忌，一生动荡刑险，出行在外尤须避险"
+        : "囚星与将星同位，性刚历练、漂泊奔波，宜武职/技术立身，忌行险侥幸",
+      classic: bad
+        ? "「七殺廉貞同位，路上埋屍」——《紫微斗数全书·太微赋》"
+        : "「廉貞七殺，流蕩天涯」——《紫微斗数全书·骨髓赋》",
+    });
+  }
+
+  // 财与囚仇：武曲（财）与廉贞（囚）分守身命
+  {
+    const bodyIdx = a.palaces.findIndex((p) => p.isBodyPalace);
+    if (bodyIdx >= 0 && bodyIdx !== S) {
+      const bodyMajors = new Set(a.palaces[bodyIdx].majorStars.map((s) => s.name as string));
+      if (
+        (soulMajors.has("武曲") && bodyMajors.has("廉贞")) ||
+        (soulMajors.has("廉贞") && bodyMajors.has("武曲"))
+      ) {
+        add({
+          name: "财与囚仇",
+          kind: "注意",
+          where: `${soulWhere}／身宫(${a.palaces[bodyIdx].earthlyBranch})`,
+          basis: "武曲（财星）与廉贞（囚星）分守身、命两宫",
+          meaning: "财星与囚星互仇：求财多阻滞纠缠，忌投机行险，宜正财实业步步为营",
+          classic: "「財與囚仇，武貞同守身命是也」——《紫微斗数全书·定貧賤局》",
+        });
+      }
     }
   }
 

@@ -203,6 +203,64 @@ describe("analysis 结构分析层", () => {
     }
   });
 
+  it("格局三期条件自洽（扫描样例盘独立复核）", () => {
+    // 极向离明：紫微守命于午
+    {
+      const c = makeChart("1954-02-15", 8);
+      const soul = c.palaces.find((p) => p.name === "命宫")!;
+      expect(soul.earthlyBranch).toBe("午");
+      expect(soul.majorStars.some((s) => s.name === "紫微")).toBe(true);
+      expect(detectPatterns(c).map((p) => p.name)).toContain("极向离明");
+    }
+    // 禄合鸳鸯：禄存与生年化禄星同守命宫
+    expect(detectPatterns(makeChart("1974-07-15", 4)).map((p) => p.name)).toContain("禄合鸳鸯");
+    // 财禄夹马：天马守命，武禄相夹
+    {
+      const c = makeChart("1959-08-16", 3);
+      const soul = c.palaces.find((p) => p.name === "命宫")!;
+      const all = [...soul.majorStars, ...soul.minorStars, ...soul.adjectiveStars].map(
+        (s) => s.name as string
+      );
+      expect(all).toContain("天马");
+      expect(detectPatterns(c).map((p) => p.name)).toContain("财禄夹马");
+    }
+    // 月生沧海：太阴在子守田宅
+    {
+      const c = makeChart("1954-07-15", 10);
+      const tian = c.palaces.find((p) => (p.name as string) === "田宅")!;
+      expect(tian.earthlyBranch).toBe("子");
+      expect(tian.majorStars.some((s) => s.name === "太阴")).toBe(true);
+      expect(detectPatterns(c).map((p) => p.name)).toContain("月生沧海");
+    }
+    // 铃昌陀武：四星交会辰戌三方
+    expect(detectPatterns(makeChart("1982-01-15", 2)).map((p) => p.name)).toContain("铃昌陀武");
+    // 廉贞七杀：加煞升凶
+    {
+      const hit = detectPatterns(makeChart("1954-07-15", 6)).find((p) => p.name === "廉贞七杀")!;
+      expect(hit).toBeTruthy();
+      expect(hit.kind).toBe("凶");
+    }
+    // 财与囚仇：武曲廉贞分守身命（独立复核）
+    {
+      const c = makeChart("1954-02-15", 10);
+      const soul = c.palaces.find((p) => p.name === "命宫")!;
+      const body = c.palaces.find((p) => p.isBodyPalace)!;
+      const sm = soul.majorStars.map((s) => s.name as string);
+      const bm = body.majorStars.map((s) => s.name as string);
+      expect(
+        (sm.includes("武曲") && bm.includes("廉贞")) || (sm.includes("廉贞") && bm.includes("武曲"))
+      ).toBe(true);
+      expect(detectPatterns(c).map((p) => p.name)).toContain("财与囚仇");
+    }
+    // 巨机居卯为吉格、居酉为注意格，两名互斥
+    expect(detectPatterns(makeChart("1962-05-15", 2)).map((p) => p.name)).toContain("巨机同临");
+    {
+      const names = detectPatterns(makeChart("1958-04-15", 6)).map((p) => p.name);
+      expect(names).toContain("巨机化酉");
+      expect(names).not.toContain("巨机同临");
+    }
+  });
+
   it("运限格局扫描：60 个流年遍历结构自洽且覆盖多种格局", () => {
     const seen = new Set<string>();
     for (let year = 1997; year < 2057; year++) {
