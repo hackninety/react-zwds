@@ -376,7 +376,13 @@ function YearRadar({ z, data }: { z: Zwds; data: LifeKlineData }) {
         {year} 年 · 十二域雷达（<i style={{ color: GOLD }}>金=最强</i>·
         <i style={{ color: "#e35bd8" }}>紫=最弱</i>）
       </div>
-      <svg width={R_SIZE} height={R_SIZE} className="kline-svg" aria-hidden="true">
+      <svg
+        viewBox={`0 0 ${R_SIZE} ${R_SIZE}`}
+        width={R_SIZE}
+        height={R_SIZE}
+        className="kline-svg"
+        aria-hidden="true"
+      >
         {[20, 50, 80].map((v) => (
           <polygon
             key={v}

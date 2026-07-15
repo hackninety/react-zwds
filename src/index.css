@@ -2211,6 +2211,12 @@ body {
   border-top: 1px dashed var(--line);
 }
 
+/* 雷达是自足图形，窄屏等比缩放即可（年/月K线是时间轴，仍走内部横向滚动） */
+.kline-radar .kline-svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .kline-mbtn-tight { margin-left: 8px; }
 
 /* ── 合盘·流年合参 ── */
@@ -2264,5 +2270,6 @@ body {
   .dp { padding: 9px 10px 8px; }
   .dp-table { font-size: 0.7rem; }
   .dp-table th, .dp-table td { padding: 4px 5px; }
-  .kline-panels { flex-direction: column; }
+  /* 竖排必须退回块级：flex 竖排按最宽子项定行宽，月K定宽画布会把整页撑出横向滚动 */
+  .kline-panels { display: block; }
 }
