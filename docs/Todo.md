@@ -125,5 +125,8 @@ PNG 导出（截图即可）、PWA、内置 AI 直连问答、独立「导出 JS
 - 长生/博士/岁前/将前十二神：盘面+导出齐全（缺的只是 K线计分 → B2）
 - K线逐年评分解释：factors 已进 tooltip 与导出（LifeKline.tsx:316）
 - 移动端表格横滚：dp-wrap / syn-year-wrap / rf-table-wrap 均有 overflow-x
+  ⚠ 该结论只覆盖**表格**，SVG 面板漏检：K线附属面板竖排曾把整页撑到 425>375 视口
+  （浏览器 shrink-to-fit 缩到 88%，表现为"整页偏左"），2026-07-15 已修（1c36009）。
+  日后动 K线/雷达/盘面尺寸，用 `documentElement.scrollWidth == clientWidth` 复验窄屏。
 - ErrorBoundary 与排盘失败提示：已有（App.tsx:145,154）
 - lunar-lite 直接依赖：仍需保留（农历⇄公历转换在用且正常，仅月天数/闰月 API 损坏已绕行）
