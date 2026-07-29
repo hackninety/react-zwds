@@ -1,6 +1,8 @@
 /**
  * AI 导出：把整张命盘 + 当前运限序列化为 JSON / Markdown，
  * 供用户下载后上传给 AI 推理（结构参照 react-iztro 的 astrolabeToJson 并扩展）。
+ * 注：人生K线（含月K线、十年规划表的均值/高光/低谷列）为盘面自研量化参考，
+ * 不随任何导出携带——自定分值易被 AI 当作命理定论引用，造成误报。
  */
 import { util } from "iztro";
 import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
@@ -15,7 +17,6 @@ import {
   type ChartAnalysis,
   type HoroPattern,
 } from "./analysis";
-import { buildMonthlyKline } from "./lifeKline";
 import { buildDecadePlan } from "./decadePlan";
 import { RULEBOOK_MD, STAR_MUTAGEN_MD, topicGuidesMd } from "./knowledge";
 
@@ -154,7 +155,7 @@ export function buildExportData(z: Zwds) {
     ),
     dayDivide: z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日",
     exportedAt: new Date().toISOString(),
-    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/四化传导链/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。",
+    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/四化传导链/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。本导出不含任何量化评分数据（如人生K线），吉凶请依星耀、四化、格局本身推断。",
   };
 
   const input = {
@@ -236,9 +237,8 @@ export function buildExportData(z: Zwds) {
     palaces,
     analysis: z.analysis ?? analyzeChart(a),
     horoscope,
-    /** 十年规划表：一限一行（叠宫/四化/命宫域均值/高光低谷/运限格局） */
-    decadePlan: buildDecadePlan(a, z.decades, z.lifeKline),
-    lifeKline: serializeLifeKline(z),
+    /** 十年规划表：一限一行（叠宫/四化/运限格局）；K线量化列不随导出 */
+    decadePlan: exportDecadePlan(z),
     /** L1 知识层：推理规则速查（Markdown 文本，供 AI 直接遵循） */
     rulebook: RULEBOOK_MD,
     /** L3 知识层：十四主星四化要诀 + 分主题推理指引 */
@@ -247,89 +247,20 @@ export function buildExportData(z: Zwds) {
   };
 }
 
-/** 选中年逐月细化（12 域；factors 仅命宫域附带以控制体积） */
-function serializeMonthly(z: Zwds) {
-  const lk = z.lifeKline;
+/** 导出版十年规划表：仅保留确定性列（叠宫/四化/运限格局），剔除K线衍生的均值/高光/低谷 */
+function exportDecadePlan(z: Zwds) {
   const a = z.astrolabe;
-  if (!lk || !a) return null;
-  const rows = lk.domains
-    .map((d) => {
-      const y = d.years.find((x) => x.year === z.pick.year);
-      if (!y) return null;
-      const mk = buildMonthlyKline(a, d.palaceIndex, z.pick.year, { open: y.open, close: y.close });
-      if (!mk) return null;
-      return {
-        domain: d.label,
-        palaceName: d.palaceName,
-        months: mk.months.map((m) => ({
-          label: m.label,
-          gz: m.gz,
-          score: m.score,
-          delta: m.delta,
-          gain: m.gain,
-          drain: m.drain,
-          pattern: m.pattern,
-          ...(d.palaceName === "命宫" ? { factors: m.factors } : {}),
-        })),
-      };
-    })
-    .filter(Boolean);
-  return rows.length ? { year: z.pick.year, note: "月K线：月干四化+月支冲合+月曜引动，定应期月份；分值以该域该年年K轨迹为基准。", domains: rows } : null;
-}
-
-/** 人生K线导出：紧凑逐年序列 + 各域高光/低谷（带计分原因） */
-function serializeLifeKline(z: Zwds) {
-  const lk = z.lifeKline;
-  if (!lk?.domains.length) return null;
-  const domains = lk.domains.map((d) => {
-    const sorted = [...d.years].sort((a, b) => b.score - a.score);
-    // 动能最大（无论好坏）——用于点出「大进大出」类年份
-    const turbulent = [...d.years].sort((a, b) => b.magnitude - a.magnitude);
-    const pick = (y: (typeof d.years)[number]) => ({
-      year: y.year,
-      ganZhi: y.ganZhi,
-      age: y.age,
-      score: y.score,
-      net: y.net,
-      gain: y.gain,
-      drain: y.drain,
-      magnitude: y.magnitude,
-      pattern: y.pattern,
-      drainNature: y.drainNature || undefined,
-      factors: y.factors,
-    });
-    const cur = d.years.find((y) => y.year === z.pick.year);
-    return {
-      palaceName: d.palaceName,
-      label: d.label,
-      earthlyBranch: d.branch,
-      isBodyPalace: d.isBody,
-      baseline: d.baseline,
-      baselineNotes: d.baselineNotes,
-      sanfangsizheng: d.compose,
-      decadeAvg: d.decadeAvg,
-      // 逐年：score=净运势, net=进-出, gain=进, drain=出, pattern=形态
-      series: d.years.map((y) => ({
-        year: y.year,
-        age: y.age,
-        score: y.score,
-        delta: y.delta,
-        gain: y.gain,
-        drain: y.drain,
-        pattern: y.pattern,
-      })),
-      highlights: sorted.slice(0, 3).map(pick),
-      lowlights: sorted.slice(-3).reverse().map(pick),
-      mostTurbulent: turbulent.slice(0, 3).map(pick),
-      currentYear: cur ? pick(cur) : null,
-    };
-  });
-  return {
-    note: lk.note,
-    monthlyOfSelectedYear: serializeMonthly(z),
-    legend: "score/净=净运势(涨跌)；gain/进=禄权科·流禄·流马·六合动能；drain/出=忌·冲·流羊陀·自化漏动能；pattern=顺遂/大进大出/破耗/平稳/平；drainNature=出项性质(主动自化漏/被动忌冲/纠缠忌入/双忌叠加/禄忌交缠)。忌落对宫按冲本宫加重；大限忌+流年忌同引=双忌叠加非线性放大。判断某年好坏须同时看 净 与 进出：大进大出=净或有限但动能大、得失起伏，非单纯好或坏。",
-    domains,
-  };
+  if (!a) return [];
+  return buildDecadePlan(a, z.decades, null).map((r) => ({
+    ageRange: r.ageRange,
+    gz: r.gz,
+    startYear: r.startYear,
+    endYear: r.endYear,
+    seatName: r.seatName,
+    seatBranch: r.seatBranch,
+    mutagens: r.mutagens,
+    patterns: r.patterns,
+  }));
 }
 
 /* ─────────────── Markdown ─────────────── */
@@ -510,6 +441,7 @@ export function buildExportMd(z: Zwds): string | null {
     z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日"
   } · 导出时间：${new Date().toLocaleString("zh-CN")}`);
   L.push(`> 星名后括号为亮度（庙旺得利平不陷），【生年X】为生年四化；各运限四化在对应章节单列。`);
+  L.push(`> 本文件不含任何量化评分数据（如人生K线），吉凶请依星耀、四化、格局本身推断。`);
   L.push("");
 
   /* 一、命主信息 */
@@ -642,20 +574,18 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(scopeSection(a, "hourly", h.hourly, `（${z.hours[z.pick.hour]?.label ?? ""}）`));
   }
 
-  /* 七、十年规划表（十二大限总览增强版） */
-  const plan = buildDecadePlan(a, z.decades, z.lifeKline);
+  /* 七、十年规划表（十二大限总览） */
+  const plan = exportDecadePlan(z);
   if (plan.length) {
     L.push(`## 七、十年规划表（十二大限总览）`);
     L.push("");
-    L.push(`> 一限一行：叠宫=该十年主题；均值/高光/低谷取综合·命宫域 K 线；运限格局为该限三方扫描（程序确定性检测，直接引用）。`);
+    L.push(`> 一限一行：叠宫=该十年主题；运限格局为该限三方扫描（程序确定性检测，直接引用）。`);
     L.push("");
-    L.push(`| 大限(虚岁) | 干支 | 公历 | 命宫叠 | 四化(禄/权/科/忌) | 均值 | 高光年 | 低谷年 | 运限格局 |`);
-    L.push(`|---|---|---|---|---|---|---|---|---|`);
+    L.push(`| 大限(虚岁) | 干支 | 公历 | 命宫叠 | 四化(禄/权/科/忌) | 运限格局 |`);
+    L.push(`|---|---|---|---|---|---|`);
     for (const r of plan) {
       L.push(
-        `| ${r.ageRange} | ${r.gz} | ${r.startYear}~${r.endYear} | ${r.seatName}（${r.seatBranch}） | ${r.mutagens.join(" / ")} | ${r.avg ?? "—"} | ${
-          r.best ? `${r.best.year}(${r.best.score})` : "—"
-        } | ${r.worst ? `${r.worst.year}(${r.worst.score})` : "—"} | ${
+        `| ${r.ageRange} | ${r.gz} | ${r.startYear}~${r.endYear} | ${r.seatName}（${r.seatBranch}） | ${r.mutagens.join(" / ")} | ${
           r.patterns.length ? r.patterns.map((p) => `${p.name}〔${p.kind}〕`).join("、") : "—"
         } |`
       );
@@ -681,87 +611,7 @@ export function buildExportMd(z: Zwds): string | null {
     L.push("");
   }
 
-  /* 九、人生K线（分域量化参考） */
-  const lk = z.lifeKline;
-  if (lk?.domains.length) {
-    L.push(`## 九、人生K线（分域量化参考）`);
-    L.push("");
-    L.push(`> ${lk.note}`);
-    L.push("");
-    L.push(`### 各域概览（十二宫）`);
-    L.push("");
-    L.push(
-      `| 域（宫·支） | 三方四正 | 基调 | 高光年(净) | 低谷年(净) | 动能最大年(形态) | 当前${z.pick.year}年 |`
-    );
-    L.push(`|---|---|---|---|---|---|---|`);
-    for (const d of lk.domains) {
-      const sorted = [...d.years].sort((a, b) => b.score - a.score);
-      const turbulent = [...d.years].sort((a, b) => b.magnitude - a.magnitude);
-      const top = sorted[0];
-      const bot = sorted[sorted.length - 1];
-      const tur = turbulent[0];
-      const cur = d.years.find((y) => y.year === z.pick.year);
-      const bodyMark = d.isBody ? "·身" : "";
-      L.push(
-        `| ${d.label}（${d.palaceName}${d.branch}${bodyMark}） | ${d.compose} | ${
-          d.baseline >= 0 ? "+" : ""
-        }${d.baseline} | ${top ? `${top.year}(${top.score})` : "-"} | ${
-          bot ? `${bot.year}(${bot.score})` : "-"
-        } | ${tur ? `${tur.year}(${tur.pattern})` : "-"} | ${
-          cur ? `${cur.score}·${cur.pattern}` : "-"
-        } |`
-      );
-    }
-    L.push("");
-    L.push(
-      `> 读法：**净=运势涨跌，进(禄权科·流禄·流马·六合)/出(忌·冲·流羊陀·自化漏)是两股动能**。故「大进大出」年（进出都大、净有限）不是简单的好或坏——如财帛该年赚得多也花/破得多，须看出项性质：主动(自化漏，多为自己花用/投资)、被动(忌冲，多为官非·罚款·外来破财)、纠缠(忌入，是非缠身)。忌落对宫按「冲本宫」加重；大限忌+流年忌同引=**双忌叠加**非线性放大；流马会禄=**禄马交驰**动中得财；流禄落生年忌宫=**禄忌交缠**变动年。命-财帛-官禄同一三合三角会同步；夫妻/迁移/福德、兄弟/疾厄/田宅、子女/交友/父母各自成组分化。身宫所在宫基调 +2 标「身」。`
-    );
-    L.push("");
-    const overall = lk.domains.find((d) => d.palaceName === "命宫") ?? lk.domains[0];
-    const cur = overall.years.find((y) => y.year === z.pick.year);
-    if (cur) {
-      L.push(`### 综合（命宫）当前 ${cur.year} ${cur.ganZhi} 明细`);
-      L.push("");
-      L.push(
-        `- ${cur.score} 分（较上年 ${cur.delta >= 0 ? "+" : ""}${cur.delta}）· 形态：**${cur.pattern}** · 进 ${cur.gain} / 出 ${cur.drain} / 净 ${cur.net >= 0 ? "+" : ""}${cur.net}${cur.drainNature ? ` · 出项：${cur.drainNature}` : ""}`
-      );
-      for (const f of cur.factors.length ? cur.factors : ["平年（三方四正无显著引动）"]) L.push(`  - ${f}`);
-      L.push("");
-    }
-
-    /* 命宫域选中年逐月细化（月K线） */
-    const curYearData = overall.years.find((y) => y.year === z.pick.year);
-    if (curYearData && a) {
-      const mk = buildMonthlyKline(a, overall.palaceIndex, z.pick.year, {
-        open: curYearData.open,
-        close: curYearData.close,
-      });
-      if (mk) {
-        L.push(`### 命宫域 ${z.pick.year} 年逐月细化（月K线）`);
-        L.push("");
-        L.push(`> ${mk.note}`);
-        L.push("");
-        L.push(`| 月 | 干支 | 分 | 较上月 | 进 | 出 | 形态 |`);
-        L.push(`|---|---|---|---|---|---|---|`);
-        for (const m of mk.months) {
-          L.push(
-            `| ${m.label} | ${m.gz} | ${m.score} | ${m.delta >= 0 ? "+" : ""}${m.delta} | ${m.gain} | ${m.drain} | ${m.pattern} |`
-          );
-        }
-        L.push("");
-        const curM = mk.months.find((m) => m.month === z.pick.month && m.leap === z.effLeap);
-        if (curM) {
-          L.push(`- 当前观测月【${curM.label}（${curM.gz}）】明细：`);
-          for (const f of curM.factors.length ? curM.factors : ["平月（无显著引动）"]) {
-            L.push(`  - ${f}`);
-          }
-          L.push("");
-        }
-      }
-    }
-  }
-
-  L.push(`## 十、AI 推理指引`);
+  L.push(`## 九、AI 推理指引`);
   L.push("");
   L.push(`将本文件整体提供给 AI 并附上您的问题。建议同时粘贴以下指令（可直接复制）：`);
   L.push("");
@@ -786,9 +636,9 @@ export function buildExportMd(z: Zwds): string | null {
   L.push(`常见问题示例（附建议取用素材）：`);
   L.push("");
   L.push(`- 我的性格优劣势与适合的行业方向？——命宫/官禄/福德三方四正快照 + 第二节格局`);
-  L.push(`- 某年运势如何，宜进取还是防守？——该年流年四化（第六/八节）+ 人生K线该年进/出/净与形态（第九节）`);
+  L.push(`- 某年运势如何，宜进取还是防守？——该年流年四化与运限格局（第六/八节）+ 流年命宫三方会照`);
   L.push(`- 感情婚姻的走势与要点？——夫妻宫三方四正快照 + 夫妻宫飞宫四化 + 大限夫妻宫叠宫`);
-  L.push(`- 近十年何时适合创业/置业/转型？——十二大限总览（第七节）+ K线高光年 + 官禄/田宅域曲线`);
+  L.push(`- 近十年何时适合创业/置业/转型？——十二大限总览（第七节）+ 各限四化与运限格局 + 官禄/田宅宫引动`);
   L.push("");
 
   /* 附录A：推理规则速查（L1 知识层） */
@@ -816,7 +666,7 @@ export function buildExportMd(z: Zwds): string | null {
 
 /* ─────────────── 下载 ─────────────── */
 
-function download(filename: string, content: string, mime: string) {
+export function download(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -828,7 +678,7 @@ function download(filename: string, content: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 800);
 }
 
-function baseFilename(z: Zwds): string {
+export function baseFilename(z: Zwds): string {
   const name = (z.input.name || "无名").replace(/[\\/:*?"<>|\s]/g, "");
   return `紫微斗数_${name}_${z.astrolabe?.solarDate ?? ""}`;
 }
@@ -842,17 +692,12 @@ const TOON_GUIDE = `# 紫微斗数命盘（AI 分析用 · TOON 数据 + 知识�
 请以严谨的紫微斗数分析师身份，严格依据数据推理：
 1. 先复述盘面骨架（basic 基本信息 + analysis.patterns 已检出格局 + 生年四化落宫），确认无误再分析；
 2. 三方四正、格局、飞宫四化、夹宫、借星均已确定性算好——直接引用 analysis.sanfang / analysis.patterns / analysis.flyMatrix / analysis.jiaGong / analysis.borrowed 与 horoscope.horoscopePatterns（运限格局），不要自行重算宫位关系；若需推衍未列关系，按 palaces[].index 环形计算（0=寅，对宫=+6，三合=±4）；
-3. 推理次序：本命（性格/禀赋/格局）→ 大限（horoscope.decadal 与 decadePlan 十年规划表）→ 流年（horoscope.yearly + lifeKline 各域该年 进/出/净/形态）→ 流月（lifeKline.monthlyOfSelectedYear 定应期）；
+3. 推理次序：本命（性格/禀赋/格局）→ 大限（horoscope.decadal 与 decadePlan 十年规划表）→ 流年（horoscope.yearly + horoscope.horoscopePatterns.yearly 运限格局）→ 流月（horoscope.monthlyOfCurrentYear 逐月四化与格局，定应期）；
 4. 每个论断注明依据（引用具体字段），区分「结构必然 / 大概率 / 倾向参考」三档确定度；
 5. 口径以 meta 为准（meta.mutagenTableDetail 为实际生效四化全表），推理框架遵循下方附录A，星情与四化事象遵循附录C，按提问主题取用附录D对应小节。`;
 
-/**
- * 「复制给 AI」的完整载荷：TOON 数据 + 推理指引 + 知识附录（A规则/C星情/D主题）。
- * 比 MD 全文省 token，又不丢失知识层。
- */
-export function buildExportAiText(z: Zwds): string | null {
-  const toon = buildExportToon(z);
-  if (!toon) return null;
+/** 由现成 TOON 文本组装 AI 载荷（底部导出面板已持有 TOON 时复用，避免重复构建） */
+export function assembleAiPayload(toon: string): string {
   return [
     TOON_GUIDE,
     "```toon",
@@ -862,6 +707,16 @@ export function buildExportAiText(z: Zwds): string | null {
     STAR_MUTAGEN_MD,
     topicGuidesMd(),
   ].join("\n\n");
+}
+
+/**
+ * 「复制给 AI」的完整载荷：TOON 数据 + 推理指引 + 知识附录（A规则/C星情/D主题）。
+ * 比 MD 全文省 token，又不丢失知识层。
+ */
+export function buildExportAiText(z: Zwds): string | null {
+  const toon = buildExportToon(z);
+  if (!toon) return null;
+  return assembleAiPayload(toon);
 }
 
 /**
@@ -884,14 +739,3 @@ export function buildExportToon(z: Zwds): string | null {
   return toonEncode({ ...rest, meta });
 }
 
-export function downloadToon(z: Zwds) {
-  const toon = buildExportToon(z);
-  if (!toon) return;
-  download(`${baseFilename(z)}.toon`, toon, "text/plain;charset=utf-8");
-}
-
-export function downloadMd(z: Zwds) {
-  const md = buildExportMd(z);
-  if (!md) return;
-  download(`${baseFilename(z)}.md`, md, "text/markdown;charset=utf-8");
-}

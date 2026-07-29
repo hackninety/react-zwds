@@ -7,8 +7,8 @@ import { LifeKline } from "./components/LifeKline";
 import { DecadePlan } from "./components/DecadePlan";
 import { PatternPanel } from "./components/PatternPanel";
 import { SynastryPanel } from "./components/SynastryPanel";
+import { ExportPanel } from "./components/ExportPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { buildExportAiText, downloadMd, downloadToon } from "./core/exportData";
 
 const STORAGE_KEY = "zwds-input-v2";
 
@@ -56,7 +56,6 @@ export default function App() {
   const [input, setInput] = useState<BirthInput>(loadInput);
   // 每次起盘自增，用于强制盘面回到默认命宫位置（即使命宫索引与上一盘相同）
   const [genId, setGenId] = useState(0);
-  const [copied, setCopied] = useState(false);
   const [showSyn, setShowSyn] = useState(false);
   const z = useZwds(input);
 
@@ -71,19 +70,6 @@ export default function App() {
   if (import.meta.env.DEV) {
     (window as unknown as { __zwds: typeof z }).__zwds = z;
   }
-
-  /** 复制 AI 载荷（TOON 数据+推理指引+知识附录）；剪贴板不可用时退回下载 TOON */
-  const copyAi = async () => {
-    const text = buildExportAiText(z);
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      downloadToon(z);
-    }
-  };
 
   const apply = (v: BirthInput) => {
     setInput(v);
@@ -115,26 +101,10 @@ export default function App() {
           <button
             type="button"
             disabled={!z.astrolabe}
-            onClick={copyAi}
-            title="复制 AI 分析载荷（TOON 紧凑数据 + 推理指引 + 规则/星情/主题知识附录）到剪贴板，直接粘贴给 AI"
+            onClick={() => document.getElementById("ai-export")?.scrollIntoView({ behavior: "smooth" })}
+            title="跳到页面底部的 AI 导出面板：复制给 AI / 导出 TOON / 导出 MD（含预览与文件大小）"
           >
-            {copied ? "已复制 ✓" : "复制给 AI"}
-          </button>
-          <button
-            type="button"
-            disabled={!z.astrolabe}
-            onClick={() => downloadToon(z)}
-            title="导出 TOON 格式（面向 LLM 的紧凑表格化编码，token 大幅缩减），适合直接喂给 AI"
-          >
-            导出 TOON
-          </button>
-          <button
-            type="button"
-            disabled={!z.astrolabe}
-            onClick={() => downloadMd(z)}
-            title="导出完整命盘+运限报告（Markdown），可上传给 AI 分析"
-          >
-            导出 MD
+            AI 导出 ↓
           </button>
         </div>
       </header>
@@ -149,6 +119,7 @@ export default function App() {
           <LifeKline z={z} />
           <DecadePlan z={z} />
           {showSyn && <SynastryPanel z={z} />}
+          <ExportPanel z={z} />
         </ErrorBoundary>
       ) : (
         <div className="err-box">

@@ -2273,3 +2273,133 @@ body {
   /* 竖排必须退回块级：flex 竖排按最宽子项定行宽，月K定宽画布会把整页撑出横向滚动 */
   .kline-panels { display: block; }
 }
+
+/* ── 底部 AI 导出面板 ── */
+.export {
+  margin-top: 14px;
+  padding: 12px 14px 12px;
+  border-radius: 14px;
+  background: rgba(10, 16, 34, 0.6);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.export-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 9px;
+  border: 1px solid rgba(85, 215, 255, 0.4);
+  background: rgba(85, 215, 255, 0.07);
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-family: inherit;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.export-actions button:hover {
+  background: rgba(85, 215, 255, 0.16);
+  box-shadow: 0 0 14px rgba(85, 215, 255, 0.35);
+}
+
+.export-actions button.export-primary {
+  border-color: rgba(243, 201, 107, 0.55);
+  background: rgba(243, 201, 107, 0.1);
+  color: var(--gold);
+}
+
+.export-actions button.export-primary:hover {
+  background: rgba(243, 201, 107, 0.2);
+  box-shadow: 0 0 16px rgba(243, 201, 107, 0.35);
+}
+
+.export-size {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--dim);
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(4, 6, 13, 0.5);
+  white-space: nowrap;
+}
+
+.export-actions button.export-primary .export-size { color: var(--gold-deep); }
+
+.export-pv-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.export-pv-label {
+  font-size: 0.72rem;
+  color: var(--dim);
+  letter-spacing: 2px;
+}
+
+.export-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.export-tabs button {
+  padding: 3px 10px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--dim);
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.export-tabs button:hover { color: var(--cyan); }
+
+.export-tabs button.on {
+  border-color: rgba(85, 215, 255, 0.4);
+  background: rgba(85, 215, 255, 0.1);
+  color: var(--cyan);
+}
+
+.export-pv-meta {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.export-preview {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(4, 6, 13, 0.55);
+  color: var(--dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.64rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+@media (max-width: 760px) {
+  .export { padding: 10px 10px 10px; }
+  .export-actions button { flex: 1 1 100%; justify-content: space-between; }
+  .export-pv-meta { margin-left: 0; flex-basis: 100%; }
+}

@@ -14,7 +14,7 @@ const stripTimestamps = (s: string) =>
 describe("exportData 导出构建器", () => {
   const z = makeZwdsFixture();
 
-  it("MD：十节 + 附录A~D 齐备且顺序正确；指引硬编码章节号有对应章节", () => {
+  it("MD：九节 + 附录A~D 齐备且顺序正确；指引硬编码章节号有对应章节", () => {
     const md = buildExportMd(z)!;
     const headers = [
       "## 一、命主信息",
@@ -25,8 +25,7 @@ describe("exportData 导出构建器", () => {
       "## 六、当前观测运限",
       "## 七、十年规划表",
       "## 八、2026 年十二流月总览",
-      "## 九、人生K线",
-      "## 十、AI 推理指引",
+      "## 九、AI 推理指引",
       "## 附录A",
       "## 附录B",
       "## 附录C",
@@ -41,8 +40,12 @@ describe("exportData 导出构建器", () => {
     // 指引里引用的章节号必须与真实章节共存（防改结构时错位）
     expect(md).toContain("第二/四/五节");
     expect(md).toContain("### 运限格局提示");
-    expect(md).toContain("逐月细化（月K线）");
     expect(md).toContain("| 大限(虚岁) |");
+    // 人生K线量化数据不随导出（自定分值易被 AI 当命理定论，致误报）
+    expect(md).not.toContain("## 十、");
+    expect(md).not.toContain("人生K线（分域量化参考）");
+    expect(md).not.toContain("月K线");
+    expect(md).not.toContain("| 均值 | 高光年 | 低谷年 |");
     // 第五节的传导链小节
     expect(md).toContain("### 四化传导链（两转三转）");
     expect(md).toContain("- **忌链**（十二宫为链首）：");
@@ -54,16 +57,25 @@ describe("exportData 导出构建器", () => {
     expect(md).toContain("### H. 命主身主");
   });
 
-  it("TOON：可解码往返，剥离知识附录且 meta 注明", () => {
+  it("TOON：可解码往返，剥离知识附录与人生K线且 meta 注明", () => {
     const toon = buildExportToon(z)!;
     const parsed = decode(toon) as Record<string, unknown>;
     expect(Object.keys(parsed)).not.toContain("rulebook");
     expect(Object.keys(parsed)).not.toContain("starEssentials");
     expect(Object.keys(parsed)).not.toContain("topicGuides");
+    expect(Object.keys(parsed)).not.toContain("lifeKline");
     const meta = parsed.meta as Record<string, unknown>;
     expect(String(meta.note)).toContain("Markdown 导出附录");
+    expect(String(meta.note)).toContain("不含任何量化评分数据");
     expect((parsed.palaces as unknown[]).length).toBe(12);
-    expect((parsed.decadePlan as unknown[]).length).toBe(12);
+    const plan = parsed.decadePlan as Record<string, unknown>[];
+    expect(plan.length).toBe(12);
+    // 十年规划表仅保留确定性列，K线衍生的均值/高光/低谷不随导出
+    for (const r of plan) {
+      expect(r.avg).toBeUndefined();
+      expect(r.best).toBeUndefined();
+      expect(r.worst).toBeUndefined();
+    }
     const horo = parsed.horoscope as Record<string, unknown>;
     const hp = horo.horoscopePatterns as Record<string, unknown>;
     expect(hp).toBeTruthy();
@@ -80,7 +92,7 @@ describe("exportData 导出构建器", () => {
     expect(ai.length).toBeGreaterThan(50_000);
   });
 
-  it("JSON：字段齐备", () => {
+  it("JSON：字段齐备，人生K线不随导出", () => {
     const data = buildExportData(z)! as Record<string, unknown>;
     for (const k of [
       "meta",
@@ -90,16 +102,13 @@ describe("exportData 导出构建器", () => {
       "analysis",
       "horoscope",
       "decadePlan",
-      "lifeKline",
       "rulebook",
       "starEssentials",
       "topicGuides",
     ]) {
       expect(data[k], `缺字段 ${k}`).toBeTruthy();
     }
-    const lk = data.lifeKline as Record<string, unknown>;
-    const monthly = lk.monthlyOfSelectedYear as Record<string, unknown>;
-    expect((monthly.domains as unknown[]).length).toBe(12);
+    expect(data.lifeKline, "人生K线量化数据不应随导出").toBeUndefined();
     const an = data.analysis as Record<string, unknown>;
     const chains = an.mutagenChains as { ji: unknown[]; lu: unknown[] };
     expect(chains.ji).toHaveLength(12);
