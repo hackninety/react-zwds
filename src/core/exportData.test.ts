@@ -172,6 +172,23 @@ describe("exportData 导出构建器", () => {
     expect(baseFilename(zAnon)).toBe("紫微斗数_无名_2000-08-16_寅时");
   });
 
+  it("文件名：勾选流日/流时时追加观测点（多份导出不重名）", () => {
+    const base = "紫微斗数_导出测试_2000-08-16_寅时";
+    // 夹具观测点：2026 农历五月十五 午时 → 公历 2026-06-29
+    expect(baseFilename(z, { withDaily: true })).toBe(`${base}_流日2026-06-29`);
+    expect(baseFilename(z, { withHourly: true })).toBe(`${base}_流时午时`);
+    expect(baseFilename(z, { withDaily: true, withHourly: true })).toBe(
+      `${base}_流日2026-06-29_流时午时`
+    );
+    // 三种组合与不勾选各不相同，同一张盘的多份导出不会互相覆盖
+    const names = new Set(
+      [{}, { withDaily: true }, { withHourly: true }, { withDaily: true, withHourly: true }].map(
+        (o) => baseFilename(z, o)
+      )
+    );
+    expect(names.size).toBe(4);
+  });
+
   it("确定性：剔除时间戳后两次构建一致", () => {
     expect(stripTimestamps(buildExportMd(z)!)).toBe(stripTimestamps(buildExportMd(z)!));
     expect(stripTimestamps(buildExportToon(z)!)).toBe(stripTimestamps(buildExportToon(z)!));

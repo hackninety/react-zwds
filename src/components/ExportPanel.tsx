@@ -49,6 +49,11 @@ export function ExportPanel({ z }: { z: Zwds }) {
     [dSnap] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const ai = useMemo(() => (toon ? assembleAiPayload(toon) : null), [toon]);
+  // 文件名与内容同源（同走 dSnap），勾选流日/流时时带观测点，多份导出不重名
+  const fileBase = useMemo(
+    () => baseFilename(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly }),
+    [dSnap] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   if (!astrolabe || !toon || !md || !ai) return null;
 
@@ -62,7 +67,7 @@ export function ExportPanel({ z }: { z: Zwds }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      download(`${baseFilename(z)}.toon`, toon, "text/plain;charset=utf-8");
+      download(`${fileBase}.toon`, toon, "text/plain;charset=utf-8");
     }
   };
 
@@ -98,7 +103,7 @@ export function ExportPanel({ z }: { z: Zwds }) {
         </button>
         <button
           type="button"
-          onClick={() => download(`${baseFilename(z)}.toon`, toon, "text/plain;charset=utf-8")}
+          onClick={() => download(`${fileBase}.toon`, toon, "text/plain;charset=utf-8")}
           title="导出 TOON 格式（面向 LLM 的紧凑表格化编码，token 大幅缩减），适合直接喂给 AI"
         >
           导出 TOON
@@ -106,7 +111,7 @@ export function ExportPanel({ z }: { z: Zwds }) {
         </button>
         <button
           type="button"
-          onClick={() => download(`${baseFilename(z)}.md`, md, "text/markdown;charset=utf-8")}
+          onClick={() => download(`${fileBase}.md`, md, "text/markdown;charset=utf-8")}
           title="导出完整命盘+运限报告（Markdown），可上传给 AI 分析"
         >
           导出 MD

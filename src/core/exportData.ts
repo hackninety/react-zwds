@@ -717,14 +717,19 @@ function padSolarDate(s: string): string {
  * 导出文件名：`紫微斗数_姓名_YYYY-MM-DD_HH-mm`（参照 react-8char 带出生时刻，
  * 便于区分同日不同时辰的盘）。时刻取**实际排盘所用**时刻——真太阳时校正后的
  * 时刻优先；未启用真太阳时（无精确时刻）则用时辰名（如 `寅时`），不编造分钟数。
+ * 勾选附加流日/流时时追加观测点（`_流日2026-06-29_流时午时`）：同一张盘的
+ * 多份导出（择日/择时各一份）不致重名互相覆盖，也能一眼看出择的是哪天哪时。
  */
-export function baseFilename(z: Zwds): string {
+export function baseFilename(z: Zwds, opts: ExportOptions = {}): string {
   const name = (z.input.name || "无名").replace(/[\\/:*?"<>|\s]/g, "");
   const a = z.astrolabe;
   const date = padSolarDate(a?.solarDate ?? "");
   const clock = z.trueSolar?.trueTime;
   const time = clock ? clock.replace(":", "-") : ((a?.time as string) ?? "");
-  return `紫微斗数_${name}_${date}${time ? `_${time}` : ""}`;
+  let s = `紫微斗数_${name}_${date}${time ? `_${time}` : ""}`;
+  if (opts.withDaily) s += `_流日${padSolarDate(z.targetSolar ?? "")}`;
+  if (opts.withHourly) s += `_流时${z.hours?.[z.pick.hour]?.label ?? ""}`;
+  return s;
 }
 
 /** TOON 场景下的推理指引（字段路径版，替代 MD 的章节号引用） */
