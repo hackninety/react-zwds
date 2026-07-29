@@ -5,8 +5,15 @@
  */
 import { describe, expect, it } from "vitest";
 import { decode } from "@toon-format/toon";
-import { buildExportAiText, buildExportData, buildExportMd, buildExportToon } from "./exportData";
+import {
+  baseFilename,
+  buildExportAiText,
+  buildExportData,
+  buildExportMd,
+  buildExportToon,
+} from "./exportData";
 import { makeZwdsFixture } from "./testFixtures";
+import type { Zwds } from "./useZwds";
 
 const stripTimestamps = (s: string) =>
   s.replace(/导出时间：[^\n|]+/g, "导出时间：X").replace(/exportedAt.*$/gm, "exportedAt: X");
@@ -150,6 +157,19 @@ describe("exportData 导出构建器", () => {
     const rows = horo.monthlyOfCurrentYear as Record<string, unknown>[];
     expect(rows.length).toBeGreaterThanOrEqual(12);
     for (const r of rows) expect(Array.isArray(r.patterns)).toBe(true);
+  });
+
+  it("文件名：日期补零 + 出生时刻（真太阳时优先，否则时辰名）", () => {
+    // 未启用真太阳时：无精确时刻，用时辰名而非编造分钟
+    expect(baseFilename(z)).toBe("紫微斗数_导出测试_2000-08-16_寅时");
+    // 启用真太阳时：用校正后的实际排盘时刻，冒号换连字符（文件名非法字符）
+    const zTrue = { ...z, trueSolar: { trueTime: "04:37" } } as unknown as Zwds;
+    expect(baseFilename(zTrue)).toBe("紫微斗数_导出测试_2000-08-16_04-37");
+    // 姓名中的空白与路径字符剔除；缺省姓名
+    const zName = { ...z, input: { ...z.input, name: "张 三/李" } } as Zwds;
+    expect(baseFilename(zName)).toBe("紫微斗数_张三李_2000-08-16_寅时");
+    const zAnon = { ...z, input: { ...z.input, name: "" } } as Zwds;
+    expect(baseFilename(zAnon)).toBe("紫微斗数_无名_2000-08-16_寅时");
   });
 
   it("确定性：剔除时间戳后两次构建一致", () => {

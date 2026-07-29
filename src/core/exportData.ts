@@ -707,9 +707,24 @@ export function download(filename: string, content: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 800);
 }
 
+/** 日期补零便于文件名排序：2000-8-16 → 2000-08-16 */
+function padSolarDate(s: string): string {
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  return m ? `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}` : s;
+}
+
+/**
+ * 导出文件名：`紫微斗数_姓名_YYYY-MM-DD_HH-mm`（参照 react-8char 带出生时刻，
+ * 便于区分同日不同时辰的盘）。时刻取**实际排盘所用**时刻——真太阳时校正后的
+ * 时刻优先；未启用真太阳时（无精确时刻）则用时辰名（如 `寅时`），不编造分钟数。
+ */
 export function baseFilename(z: Zwds): string {
   const name = (z.input.name || "无名").replace(/[\\/:*?"<>|\s]/g, "");
-  return `紫微斗数_${name}_${z.astrolabe?.solarDate ?? ""}`;
+  const a = z.astrolabe;
+  const date = padSolarDate(a?.solarDate ?? "");
+  const clock = z.trueSolar?.trueTime;
+  const time = clock ? clock.replace(":", "-") : ((a?.time as string) ?? "");
+  return `紫微斗数_${name}_${date}${time ? `_${time}` : ""}`;
 }
 
 /** TOON 场景下的推理指引（字段路径版，替代 MD 的章节号引用） */
