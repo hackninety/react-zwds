@@ -2403,3 +2403,27 @@ body {
   .export-actions button { flex: 1 1 100%; justify-content: space-between; }
   .export-pv-meta { margin-left: 0; flex-basis: 100%; }
 }
+
+.export-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-bottom: 8px;
+}
+
+.export-opts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: var(--dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.export-opts input[type="checkbox"] {
+  accent-color: var(--cyan);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+}

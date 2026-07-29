@@ -29,6 +29,14 @@ function getSelfMutagens(p: Astrolabe["palaces"][number]) {
     .filter((x) => own.has(x.star));
 }
 
+/** 导出选项：流日/流时默认不导出（无关层级稀释 AI 注意力，择日择时场景再勾选） */
+export type ExportOptions = {
+  /** 附当前观测流日（择日用） */
+  withDaily?: boolean;
+  /** 附当前观测流时（择时用） */
+  withHourly?: boolean;
+};
+
 type AnyStar = {
   name: string;
   type?: string;
@@ -47,6 +55,33 @@ function serializeStar(star: AnyStar) {
   };
 }
 
+/**
+ * 杂耀·中权重名单（乙级辅曜，可参与断事）：桃花四曜、刑姚巫月煞、台座光贵、辅诰池阁、华盖孤寡。
+ * 未列入的杂耀（解神/年解/天官/天福/天厨/天才/天寿/天哭/天虚/天德/月德/蜚廉/破碎/
+ * 天空/旬空/截空/空亡/截路/天伤/天使等）为低权重，仅作叠加参考。
+ */
+const ADJ_MID_WEIGHT = new Set([
+  "红鸾", "天喜", "天姚", "咸池",
+  "天刑", "天巫", "天月", "阴煞",
+  "三台", "八座", "恩光", "天贵",
+  "台辅", "封诰", "龙池", "凤阁",
+  "华盖", "孤辰", "寡宿",
+]);
+
+/** 星耀权重口径（写入 meta 与 MD，供 AI 按权重取舍） */
+const STAR_WEIGHT_NOTE =
+  "星耀权重三档：主星（majorStars）＞辅星（minorStars，六吉六煞禄存天马）＞杂耀（adjectiveStars）。" +
+  "杂耀再分两档——中权重（可参与断事）：红鸾天喜天姚咸池·天刑天巫天月阴煞·三台八座恩光天贵·台辅封诰龙池凤阁·华盖孤辰寡宿；" +
+  "其余为低权重，仅在与主辅星同宫时作叠加参考，切勿以低权重杂耀独立断大事。";
+
+function serializeAdjStar(star: AnyStar) {
+  return { ...serializeStar(star), weight: ADJ_MID_WEIGHT.has(star.name) ? "中" : "低" };
+}
+
+/** 小限口径备注（防 AI 把小限与流年两套年系统混同） */
+const AGE_NOTE =
+  "小限为辅助年系统（生年支三合起、男顺女逆），与流年并行；论某年吉凶以流年四化引动为主，小限仅作叠加参考——勿把小限宫当作流年命宫，勿以小限单独断吉凶。";
+
 function serializeHoroscopeItem(item: Horoscope[Scope]) {
   return {
     index: item.index,
@@ -57,24 +92,6 @@ function serializeHoroscopeItem(item: Horoscope[Scope]) {
     mutagen: item.mutagen,
     ...(item.stars ? { stars: item.stars.map((g) => g.map(serializeStar)) } : {}),
   };
-}
-
-/** 十二大限一览（每限取运中年份计算一次运限） */
-function getAllDecadals(z: Zwds) {
-  const { astrolabe, decades } = z;
-  if (!astrolabe) return [];
-  const results: Record<string, unknown>[] = [];
-  for (const d of decades) {
-    const midYear = d.startYear + 5;
-    const dateStr = lunarToSolarStr(midYear, 6, 15) ?? `${midYear}-7-15`;
-    try {
-      const h = astrolabe.horoscope(dateStr, 0);
-      results.push({ ageRange: d.range, ...serializeHoroscopeItem(h.decadal) });
-    } catch {
-      /* 超出历法范围则跳过 */
-    }
-  }
-  return results;
 }
 
 /** 当前流年的流月一览（含闰月位、逐月格局扫描） */
@@ -132,7 +149,7 @@ function horoscopePatternsOf(
   return scanHoroscopePatterns(a, h);
 }
 
-export function buildExportData(z: Zwds) {
+export function buildExportData(z: Zwds, opts: ExportOptions = {}) {
   const a = z.astrolabe;
   if (!a) return null;
   const h = z.horoscope;
@@ -155,7 +172,8 @@ export function buildExportData(z: Zwds) {
     ),
     dayDivide: z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日",
     exportedAt: new Date().toISOString(),
-    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/四化传导链/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。本导出不含任何量化评分数据（如人生K线），吉凶请依星耀、四化、格局本身推断。",
+    note: "所有命盘分析解读请以 meta.school 指定流派为准；brightness=星耀亮度（庙旺得利平不陷），mutagen=生年四化，selfMutagens=自化（宫干四化入本宫·离心），各运限四化见 horoscope 对应层级。analysis 字段为确定性结构分析（格局/三方四正快照/飞宫矩阵/四化传导链/夹宫/借星），推理时请直接引用，勿自行重算宫位关系。本导出不含任何量化评分数据（如人生K线），吉凶请依星耀、四化、格局本身推断。palaces[].ages=各宫小限岁数（虚岁）——" + AGE_NOTE,
+    starWeightNote: STAR_WEIGHT_NOTE,
   };
 
   const input = {
@@ -197,7 +215,8 @@ export function buildExportData(z: Zwds) {
     earthlyBranch: p.earthlyBranch,
     majorStars: p.majorStars.map(serializeStar),
     minorStars: p.minorStars.map(serializeStar),
-    adjectiveStars: p.adjectiveStars.map(serializeStar),
+    /** weight=杂耀权重（中=可参与断事，低=仅叠加参考），口径见 meta.starWeightNote */
+    adjectiveStars: p.adjectiveStars.map(serializeAdjStar),
     changsheng12: p.changsheng12,
     boshi12: p.boshi12,
     jiangqian12: p.jiangqian12,
@@ -214,16 +233,16 @@ export function buildExportData(z: Zwds) {
         nominalAge: h.age.nominalAge,
         pick: { ...z.pick, clampedDay: z.clampedDay },
         decadal: serializeHoroscopeItem(h.decadal),
-        age: { ...serializeHoroscopeItem(h.age), nominalAge: h.age.nominalAge },
+        age: { ...serializeHoroscopeItem(h.age), nominalAge: h.age.nominalAge, note: AGE_NOTE },
         yearly: {
           ...serializeHoroscopeItem(h.yearly),
           yearlyDecStar: h.yearly.yearlyDecStar,
         },
         monthly: serializeHoroscopeItem(h.monthly),
-        daily: serializeHoroscopeItem(h.daily),
-        hourly: serializeHoroscopeItem(h.hourly),
+        /* 流日/流时默认不导出：与所问主题无关时纯属噪音，择日择时场景由用户勾选附加 */
+        ...(opts.withDaily ? { daily: serializeHoroscopeItem(h.daily) } : {}),
+        ...(opts.withHourly ? { hourly: serializeHoroscopeItem(h.hourly) } : {}),
         yearsOfCurrentDecade: z.years,
-        allDecadals: getAllDecadals(z),
         monthlyOfCurrentYear: getMonthlyOfYear(z),
         /** 运限格局扫描：以大限/流年命宫三方为中心（本命星曜+运限四化+运限流曜） */
         horoscopePatterns: horoscopePatternsOf(z),
@@ -422,7 +441,7 @@ function flyMatrixMd(an: ChartAnalysis): string[] {
   return L;
 }
 
-export function buildExportMd(z: Zwds): string | null {
+export function buildExportMd(z: Zwds, opts: ExportOptions = {}): string | null {
   const a = z.astrolabe;
   if (!a) return null;
   const h = z.horoscope;
@@ -441,6 +460,7 @@ export function buildExportMd(z: Zwds): string | null {
     z.input.dayDivide === "current" ? "晚子时归当日" : "晚子时归次日"
   } · 导出时间：${new Date().toLocaleString("zh-CN")}`);
   L.push(`> 星名后括号为亮度（庙旺得利平不陷），【生年X】为生年四化；各运限四化在对应章节单列。`);
+  L.push(`> ${STAR_WEIGHT_NOTE}`);
   L.push(`> 本文件不含任何量化评分数据（如人生K线），吉凶请依星耀、四化、格局本身推断。`);
   L.push("");
 
@@ -491,7 +511,9 @@ export function buildExportMd(z: Zwds): string | null {
       );
     }
     L.push(`- 辅星：${starList(p.minorStars)}`);
-    L.push(`- 杂耀：${starList(p.adjectiveStars)}`);
+    const adjMid = p.adjectiveStars.filter((s) => ADJ_MID_WEIGHT.has(s.name));
+    const adjLow = p.adjectiveStars.filter((s) => !ADJ_MID_WEIGHT.has(s.name));
+    L.push(`- 杂耀·中权重：${starList(adjMid)}；低权重（仅叠加参考）：${starList(adjLow)}`);
     const selfMuts = getSelfMutagens(p);
     if (selfMuts.length) {
       L.push(
@@ -518,15 +540,16 @@ export function buildExportMd(z: Zwds): string | null {
       `- 观测点：公历 ${h.solarDate}（农历 ${h.lunarDate}），虚岁 ${h.age.nominalAge}`
     );
     const dec = z.activeDecadeIdx >= 0 ? z.decades[z.activeDecadeIdx] : null;
-    L.push(
-      `- 当前序列：${
-        dec ? `大限 ${dec.range[0]}~${dec.range[1]}（${dec.heavenlyStem}${dec.earthlyBranch}）` : "童限"
-      } → 流年 ${z.pick.year} → 流月 ${currentMonthCell(z)?.label ?? z.pick.month}（${
-        currentMonthCell(z)?.gz ?? ""
-      }） → 流日 ${z.days[z.clampedDay - 1]?.label ?? z.clampedDay}（${
-        z.days[z.clampedDay - 1]?.gz ?? ""
-      }） → 流时 ${z.hours[z.pick.hour]?.label ?? ""}（${z.hours[z.pick.hour]?.gz ?? ""}）`
-    );
+    let seq = `- 当前序列：${
+      dec ? `大限 ${dec.range[0]}~${dec.range[1]}（${dec.heavenlyStem}${dec.earthlyBranch}）` : "童限"
+    } → 流年 ${z.pick.year} → 流月 ${currentMonthCell(z)?.label ?? z.pick.month}（${
+      currentMonthCell(z)?.gz ?? ""
+    }）`;
+    if (opts.withDaily)
+      seq += ` → 流日 ${z.days[z.clampedDay - 1]?.label ?? z.clampedDay}（${z.days[z.clampedDay - 1]?.gz ?? ""}）`;
+    if (opts.withHourly)
+      seq += ` → 流时 ${z.hours[z.pick.hour]?.label ?? ""}（${z.hours[z.pick.hour]?.gz ?? ""}）`;
+    L.push(seq);
     L.push("");
 
     /* 运限格局提示（程序确定性扫描） */
@@ -555,6 +578,8 @@ export function buildExportMd(z: Zwds): string | null {
     const ageSeat = a.palaces[h.age.index];
     L.push(`### 小限（虚岁 ${h.age.nominalAge}）`);
     L.push("");
+    L.push(`> ${AGE_NOTE}`);
+    L.push("");
     L.push(`- 小限落于本命【${ageSeat?.name ?? "?"}】宫（地支${ageSeat?.earthlyBranch ?? "?"}）`);
     if (h.age.palaceNames?.length) {
       L.push("");
@@ -570,8 +595,9 @@ export function buildExportMd(z: Zwds): string | null {
     L.push(`- 流年将前十二神：${h.yearly.yearlyDecStar.jiangqian12.join("、")}（同上）`);
     L.push("");
     L.push(scopeSection(a, "monthly", h.monthly, `（${currentMonthCell(z)?.label ?? ""}）`));
-    L.push(scopeSection(a, "daily", h.daily, `（${z.days[z.clampedDay - 1]?.label ?? ""}）`));
-    L.push(scopeSection(a, "hourly", h.hourly, `（${z.hours[z.pick.hour]?.label ?? ""}）`));
+    /* 流日/流时默认不导出（择日择时勾选附加），防无关层级稀释 AI 注意力 */
+    if (opts.withDaily) L.push(scopeSection(a, "daily", h.daily, `（${z.days[z.clampedDay - 1]?.label ?? ""}）`));
+    if (opts.withHourly) L.push(scopeSection(a, "hourly", h.hourly, `（${z.hours[z.pick.hour]?.label ?? ""}）`));
   }
 
   /* 七、十年规划表（十二大限总览） */
@@ -627,9 +653,12 @@ export function buildExportMd(z: Zwds): string | null {
     `> 4. 每个论断须注明依据（引用具体宫位/星耀/四化/格局），并区分「结构必然 / 大概率 / 倾向参考」三档确定度；`
   );
   L.push(`> 5. 推理框架遵循附录A《规则速查》；星情与四化事象反应遵循附录C；按提问主题取用附录D对应小节的宫位组合与检查清单；流派口径以本文件 meta 与附录B为准，不得改星、改宫、改四化。`);
+  L.push(
+    `> 6. 如需切换为**飞宫四化视角**（以四化流向为主轴论盘），直接引用第五节全矩阵与传导链：忌链看压力/亏欠流向，禄链看资源/情义流向，配合离心/向心自化论收放——仍以本文件已算好的矩阵为准，勿自行重飞。`
+  );
   if (z.input.residence) {
     L.push(
-      `> 6. 命主常居住地为「${z.input.residence}」（不参与排盘），涉及迁移宫、方位喜忌、异地发展等议题时结合参考。`
+      `> 7. 命主常居住地为「${z.input.residence}」（不参与排盘），涉及迁移宫、方位喜忌、异地发展等议题时结合参考。`
     );
   }
   L.push("");
@@ -694,7 +723,9 @@ const TOON_GUIDE = `# 紫微斗数命盘（AI 分析用 · TOON 数据 + 知识�
 2. 三方四正、格局、飞宫四化、夹宫、借星均已确定性算好——直接引用 analysis.sanfang / analysis.patterns / analysis.flyMatrix / analysis.jiaGong / analysis.borrowed 与 horoscope.horoscopePatterns（运限格局），不要自行重算宫位关系；若需推衍未列关系，按 palaces[].index 环形计算（0=寅，对宫=+6，三合=±4）；
 3. 推理次序：本命（性格/禀赋/格局）→ 大限（horoscope.decadal 与 decadePlan 十年规划表）→ 流年（horoscope.yearly + horoscope.horoscopePatterns.yearly 运限格局）→ 流月（horoscope.monthlyOfCurrentYear 逐月四化与格局，定应期）；
 4. 每个论断注明依据（引用具体字段），区分「结构必然 / 大概率 / 倾向参考」三档确定度；
-5. 口径以 meta 为准（meta.mutagenTableDetail 为实际生效四化全表），推理框架遵循下方附录A，星情与四化事象遵循附录C，按提问主题取用附录D对应小节。`;
+5. 口径以 meta 为准（meta.mutagenTableDetail 为实际生效四化全表），推理框架遵循下方附录A，星情与四化事象遵循附录C，按提问主题取用附录D对应小节；
+6. 星耀权重按 meta.starWeightNote 与 palaces[].adjectiveStars[].weight 取舍——低权重杂耀仅叠加参考，勿独立断大事；小限（horoscope.age 与 palaces[].ages）为辅助年系统，勿与流年混同（口径见 horoscope.age.note）；
+7. 如需切换为飞宫四化视角（以四化流向为主轴论盘），直接引用 analysis.flyMatrix 与 analysis.mutagenChains——忌链看压力/亏欠流向，禄链看资源/情义流向，勿自行重飞。`;
 
 /** 由现成 TOON 文本组装 AI 载荷（底部导出面板已持有 TOON 时复用，避免重复构建） */
 export function assembleAiPayload(toon: string): string {
@@ -713,8 +744,8 @@ export function assembleAiPayload(toon: string): string {
  * 「复制给 AI」的完整载荷：TOON 数据 + 推理指引 + 知识附录（A规则/C星情/D主题）。
  * 比 MD 全文省 token，又不丢失知识层。
  */
-export function buildExportAiText(z: Zwds): string | null {
-  const toon = buildExportToon(z);
+export function buildExportAiText(z: Zwds, opts: ExportOptions = {}): string | null {
+  const toon = buildExportToon(z, opts);
   if (!toon) return null;
   return assembleAiPayload(toon);
 }
@@ -724,8 +755,8 @@ export function buildExportAiText(z: Zwds): string | null {
  * 与 JSON 同一数据、面向 LLM 的紧凑表格化编码（均匀数组转表头+行）。
  * 长篇知识附录（规则速查/星情要诀/主题指引）为 Markdown 文本，剥离并注明见 MD 导出。
  */
-export function buildExportToon(z: Zwds): string | null {
-  const data = buildExportData(z);
+export function buildExportToon(z: Zwds, opts: ExportOptions = {}): string | null {
+  const data = buildExportData(z, opts);
   if (!data) return null;
   const { rulebook, starEssentials, topicGuides, ...rest } = data;
   void rulebook;

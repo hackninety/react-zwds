@@ -445,6 +445,8 @@ export function SynastryPanel({ z }: { z: Zwds }) {
               </div>
               <div className="syn-year-concl">
                 {yearly.jiLine && <p>◆ {yearly.jiLine}</p>}
+                {/* K线强弱结论仅盘面展示，复制报告不含（防 AI 把量化分值当命理定论） */}
+                {yearly.klineConclusion && <p>◆ {yearly.klineConclusion}</p>}
                 {yearly.conclusions.map((c, i) => (
                   <p key={i}>◆ {c}</p>
                 ))}

@@ -46,6 +46,11 @@ describe("exportData 导出构建器", () => {
     expect(md).not.toContain("人生K线（分域量化参考）");
     expect(md).not.toContain("月K线");
     expect(md).not.toContain("| 均值 | 高光年 | 低谷年 |");
+    // 杂耀权重分档 + 小限口径备注 + 四化视角指引
+    expect(md).toContain("- 杂耀·中权重：");
+    expect(md).toContain("星耀权重三档");
+    expect(md).toContain("小限为辅助年系统");
+    expect(md).toContain("飞宫四化视角");
     // 第五节的传导链小节
     expect(md).toContain("### 四化传导链（两转三转）");
     expect(md).toContain("- **忌链**（十二宫为链首）：");
@@ -80,6 +85,32 @@ describe("exportData 导出构建器", () => {
     const hp = horo.horoscopePatterns as Record<string, unknown>;
     expect(hp).toBeTruthy();
     expect(Array.isArray(hp.monthly)).toBe(true);
+    // allDecadals 与 decadePlan 重叠，已删；流日/流时默认不导出
+    expect(Object.keys(horo)).not.toContain("allDecadals");
+    expect(Object.keys(horo)).not.toContain("daily");
+    expect(Object.keys(horo)).not.toContain("hourly");
+    // 小限口径备注随 age 携带；杂耀带权重档位
+    expect(String((horo.age as Record<string, unknown>).note)).toContain("辅助年系统");
+    const palaces = parsed.palaces as { adjectiveStars: { weight?: string }[] }[];
+    const adjs = palaces.flatMap((p) => p.adjectiveStars);
+    expect(adjs.length).toBeGreaterThan(0);
+    for (const s of adjs) expect(["中", "低"]).toContain(s.weight);
+  });
+
+  it("流日/流时：默认不导出，勾选后附带", () => {
+    const md = buildExportMd(z)!;
+    expect(md).not.toContain("### 流日");
+    expect(md).not.toContain("### 流时");
+    const md2 = buildExportMd(z, { withDaily: true, withHourly: true })!;
+    expect(md2).toContain("### 流日");
+    expect(md2).toContain("### 流时");
+    const data2 = buildExportData(z, { withDaily: true, withHourly: true })! as Record<
+      string,
+      unknown
+    >;
+    const horo2 = data2.horoscope as Record<string, unknown>;
+    expect(horo2.daily).toBeTruthy();
+    expect(horo2.hourly).toBeTruthy();
   });
 
   it("AI 载荷：指引 + toon 代码块 + 附录A/C/D 全在", () => {

@@ -28,17 +28,26 @@ const TAB_META: Record<Tab, { label: string; hint: string }> = {
 export function ExportPanel({ z }: { z: Zwds }) {
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("ai");
+  // 流日/流时默认不导出，择日/择时场景独立勾选（防无关层级稀释 AI 注意力）
+  const [withDaily, setWithDaily] = useState(false);
+  const [withHourly, setWithHourly] = useState(false);
 
   // 拨盘点击属高频交互，导出重建（数十次 horoscope 调用）走延迟值，不阻塞盘面刷新
   const { astrolabe, horoscope, input, pick } = z;
   const snap = useMemo(
-    () => ({ astrolabe, horoscope, input, pick }),
-    [astrolabe, horoscope, input, pick]
+    () => ({ astrolabe, horoscope, input, pick, withDaily, withHourly }),
+    [astrolabe, horoscope, input, pick, withDaily, withHourly]
   );
   const dSnap = useDeferredValue(snap);
 
-  const toon = useMemo(() => buildExportToon(z), [dSnap]); // eslint-disable-line react-hooks/exhaustive-deps
-  const md = useMemo(() => buildExportMd(z), [dSnap]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toon = useMemo(
+    () => buildExportToon(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly }),
+    [dSnap] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const md = useMemo(
+    () => buildExportMd(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly }),
+    [dSnap] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const ai = useMemo(() => (toon ? assembleAiPayload(toon) : null), [toon]);
 
   if (!astrolabe || !toon || !md || !ai) return null;
@@ -64,6 +73,17 @@ export function ExportPanel({ z }: { z: Zwds }) {
         <span className="pat-sub">
           复制或下载命盘数据喂给 AI · 均不含人生K线量化数据（防 AI 把自定分值当命理定论，产生误报）
         </span>
+      </div>
+
+      <div className="export-opts">
+        <label title="流日运限仅在出行择日等场景有用，默认不导出，防止无关数据稀释 AI 注意力">
+          <input type="checkbox" checked={withDaily} onChange={(e) => setWithDaily(e.target.checked)} />
+          附当前流日（择日用，默认不导出）
+        </label>
+        <label title="流时运限仅在办事择时等场景有用，默认不导出，防止无关数据稀释 AI 注意力">
+          <input type="checkbox" checked={withHourly} onChange={(e) => setWithHourly(e.target.checked)} />
+          附当前流时（择时用，默认不导出）
+        </label>
       </div>
 
       <div className="export-actions">

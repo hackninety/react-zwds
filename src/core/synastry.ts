@@ -347,7 +347,7 @@ export type YearlySide = {
   seatBranch: string;
   /** 流年四化落宫：「禄=太阳→官禄」 */
   mutagenLines: string[];
-  /** 命宫域 K 线该年 */
+  /** 命宫域 K 线该年（仅盘面展示，不随报告导出——量化分值易被 AI 当命理定论致误报） */
   kline: { score: number; pattern: string; net: number } | null;
   /** 与太岁关系：值/冲/刑/害/合/平 */
   taisui: string;
@@ -361,7 +361,10 @@ export type YearlySynastry = {
   b: YearlySide;
   /** 流年化忌星在双方盘各落何宫 */
   jiLine: string;
+  /** 纯命理结论（太岁/运限格局），随报告导出 */
   conclusions: string[];
+  /** 基于 K 线分值的强弱对比结论：仅盘面展示，不随报告导出 */
+  klineConclusion: string | null;
 };
 
 function yearlySide(
@@ -443,23 +446,24 @@ export function buildYearlySynastry(
     ? `流年化忌（${jiStar}）落 ${a.name}【${seatOf(aChart)}】 / ${b.name}【${seatOf(bChart)}】——今年的坑各在此处`
     : "";
 
-  const conclusions: string[] = [];
+  // K线强弱对比单列（仅盘面展示，不入 conclusions——报告导出须保持纯命理口径）
+  let klineConclusion: string | null = null;
   if (a.kline && b.kline) {
     const diff = a.kline.score - b.kline.score;
     if (Math.abs(diff) >= 8) {
       const strong = diff > 0 ? a : b;
       const weak = diff > 0 ? b : a;
-      conclusions.push(
-        `今年 ${strong.name} 明显更旺（${strong.kline!.score} vs ${weak.kline!.score}）：共同行动宜由 ${strong.name} 多担主导，${weak.name} 宜稳守配合。`
-      );
+      klineConclusion = `今年 ${strong.name} 明显更旺（${strong.kline!.score} vs ${weak.kline!.score}）：共同行动宜由 ${strong.name} 多担主导，${weak.name} 宜稳守配合。`;
     } else if (a.kline.score >= 60 && b.kline.score >= 60) {
-      conclusions.push(`双双顺遂（${a.kline.score} / ${b.kline.score}）：宜乘势共进，合作事项可提速。`);
+      klineConclusion = `双双顺遂（${a.kline.score} / ${b.kline.score}）：宜乘势共进，合作事项可提速。`;
     } else if (a.kline.score <= 45 && b.kline.score <= 45) {
-      conclusions.push(`双双承压（${a.kline.score} / ${b.kline.score}）：共同事务宜守不宜攻，避免此时做重大绑定。`);
+      klineConclusion = `双双承压（${a.kline.score} / ${b.kline.score}）：共同事务宜守不宜攻，避免此时做重大绑定。`;
     } else {
-      conclusions.push(`两人强弱相当（${a.kline.score} / ${b.kline.score}）：按分工各自推进即可。`);
+      klineConclusion = `两人强弱相当（${a.kline.score} / ${b.kline.score}）：按分工各自推进即可。`;
     }
   }
+
+  const conclusions: string[] = [];
   for (const s of [a, b]) {
     if (s.taisui === "冲太岁" || s.taisui === "刑太岁") {
       conclusions.push(`${s.name} ${s.taisui}：本年变动与是非偏多，重大共同决策宜听多方意见、放缓节奏。`);
@@ -476,7 +480,7 @@ export function buildYearlySynastry(
     );
   }
 
-  return { year, gz, a, b, jiLine, conclusions };
+  return { year, gz, a, b, jiLine, conclusions, klineConclusion };
 }
 
 /** 合盘报告 Markdown（复制给 AI 或留存；可附当前年流年合参） */
@@ -520,11 +524,7 @@ export function buildSynastryMd(r: SynastryResult, yearly?: YearlySynastry | nul
     L.push(`|---|---|---|`);
     L.push(`| 流年命宫叠 | 本命${yearly.a.seatName}（${yearly.a.seatBranch}） | 本命${yearly.b.seatName}（${yearly.b.seatBranch}） |`);
     L.push(`| 流年四化落宫 | ${yearly.a.mutagenLines.join("，")} | ${yearly.b.mutagenLines.join("，")} |`);
-    L.push(
-      `| 命宫域K线 | ${yearly.a.kline ? `${yearly.a.kline.score}·${yearly.a.kline.pattern}（净${yearly.a.kline.net >= 0 ? "+" : ""}${yearly.a.kline.net}）` : "—"} | ${
-        yearly.b.kline ? `${yearly.b.kline.score}·${yearly.b.kline.pattern}（净${yearly.b.kline.net >= 0 ? "+" : ""}${yearly.b.kline.net}）` : "—"
-      } |`
-    );
+    /* 命宫域K线对比仅盘面展示，不随报告导出（量化分值易被 AI 当命理定论致误报） */
     L.push(`| 太岁 | ${yearly.a.taisui} | ${yearly.b.taisui} |`);
     L.push(
       `| 运限格局 | ${yearly.a.patterns.map((p) => p.name).join("、") || "无"} | ${yearly.b.patterns.map((p) => p.name).join("、") || "无"} |`

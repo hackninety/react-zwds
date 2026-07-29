@@ -76,7 +76,9 @@ describe("buildYearlySynastry 流年合参", () => {
     expect(r.a.kline).not.toBeNull();
     expect(r.b.kline).not.toBeNull();
     expect(r.jiLine).toContain("流年化忌");
-    expect(r.conclusions.length).toBeGreaterThanOrEqual(1);
+    // K线强弱结论拆到独立字段（仅盘面展示，不随报告导出）
+    expect(r.klineConclusion).toBeTruthy();
+    for (const c of r.conclusions) expect(c).not.toContain("K线");
   });
 
   it("太岁关系正确（2028 戊申：申冲寅=乙冲太岁；2024 甲辰：辰=甲值太岁）", () => {

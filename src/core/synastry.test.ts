@@ -99,4 +99,20 @@ describe("buildSynastry 合盘", () => {
     expect(md).toContain("## 互动明细");
     expect(md).toContain("## 总评");
   });
+
+  it("流年合参报告不含K线量化对比（仅盘面展示）", async () => {
+    const { buildYearlySynastry } = await import("./synastry");
+    const { buildLifeKline, decadesOfChart } = await import("./lifeKline");
+    const aLk = buildLifeKline(A, decadesOfChart(A, 2000), 2000);
+    const bLk = buildLifeKline(B, decadesOfChart(B, 1998), 1998);
+    const yearly = buildYearlySynastry(A, B, "甲", "乙", 2026, aLk, bLk)!;
+    // K线结论拆到独立字段（盘面用），conclusions 与报告保持纯命理口径
+    expect(yearly.a.kline).toBeTruthy();
+    expect(yearly.klineConclusion).toBeTruthy();
+    for (const c of yearly.conclusions) expect(c).not.toContain("K线");
+    const md = buildSynastryMd(r, yearly);
+    expect(md).toContain("## 流年合参");
+    expect(md).not.toContain("命宫域K线");
+    expect(md).not.toContain(yearly.klineConclusion!);
+  });
 });
