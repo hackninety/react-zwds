@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyTrueSolar,
+  bodyPalaceBranchOf,
   equationOfTime,
   hourGanZhi,
   isYangStem,
@@ -74,5 +75,35 @@ describe("时辰与真太阳时", () => {
   it("非法输入返回 null", () => {
     expect(applyTrueSolar("bad", "12:00", 120)).toBeNull();
     expect(applyTrueSolar("2000-6-15", "xx", 120)).toBeNull();
+  });
+});
+
+describe("中州派地/人盘身宫", () => {
+  it("bodyPalaceBranchOf：重排后从宫列表取真身宫支（iztro 顶层字段滞留天盘旧值）", async () => {
+    const { astro } = await import("iztro");
+    const cast = (astroType: "heaven" | "earth" | "human") =>
+      astro.withOptions({
+        type: "solar",
+        dateStr: "1990-06-15",
+        timeIndex: 4,
+        gender: "男" as never,
+        isLeapMonth: false,
+        fixLeap: true,
+        language: "zh-CN",
+        astroType,
+        config: { algorithm: "zhongzhou", yearDivide: "exact", horoscopeDivide: "exact" },
+      });
+    const heaven = cast("heaven");
+    // 天盘：顶层字段与宫列表一致，helper 透传
+    expect(bodyPalaceBranchOf(heaven.palaces, heaven.earthlyBranchOfBodyPalace)).toBe(
+      heaven.earthlyBranchOfBodyPalace
+    );
+    for (const t of ["earth", "human"] as const) {
+      const a = cast(t);
+      const real = a.palaces.find((p) => p.isBodyPalace)!.earthlyBranch;
+      expect(bodyPalaceBranchOf(a.palaces, a.earthlyBranchOfBodyPalace)).toBe(real);
+      // 上游 rearrangeAstrolable 目前不更新顶层身宫支；iztro 修复后此断言变红，即可评估移除本兜底
+      expect(a.earthlyBranchOfBodyPalace).not.toBe(real);
+    }
   });
 });

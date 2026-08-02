@@ -8,7 +8,7 @@
 import { astro } from "iztro";
 import type { GenderName } from "iztro/lib/i18n";
 import type { Astrolabe, BirthInput, DecadeInfo } from "./useZwds";
-import { MUTAGEN_TABLES, TIME_OPTIONS } from "./utils";
+import { MUTAGEN_TABLES, TIME_OPTIONS, bodyPalaceBranchOf } from "./utils";
 import { util } from "iztro";
 import { buildLifeKline } from "./lifeKline";
 
@@ -184,7 +184,7 @@ export function buildHourCandidates(input: BirthInput): HourCandidate[] {
       range: t.range,
       soulBranch: (soul?.earthlyBranch as string) ?? "?",
       soulMajors: majors.length ? majors.join("、") : `空宫（借${borrowed || "对宫"}）`,
-      bodyBranch: chart.earthlyBranchOfBodyPalace as string,
+      bodyBranch: bodyPalaceBranchOf(chart.palaces, chart.earthlyBranchOfBodyPalace as string),
       fiveElements: chart.fiveElementsClass as string,
       chart,
     });

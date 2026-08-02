@@ -6,7 +6,15 @@
  */
 import { util } from "iztro";
 import type { Astrolabe, Horoscope, Zwds } from "./useZwds";
-import { MUTAGEN_CHARS, MUTAGEN_TABLE_LABEL, SCOPE_META, STEMS, fixIndex, type Scope } from "./utils";
+import {
+  MUTAGEN_CHARS,
+  MUTAGEN_TABLE_LABEL,
+  SCOPE_META,
+  STEMS,
+  bodyPalaceBranchOf,
+  fixIndex,
+  type Scope,
+} from "./utils";
 import { lunarToSolarStr } from "./lunar";
 import { encode as toonEncode } from "@toon-format/toon";
 import {
@@ -199,7 +207,7 @@ export function buildExportData(z: Zwds, opts: ExportOptions = {}) {
     sign: a.sign,
     zodiac: a.zodiac,
     earthlyBranchOfSoulPalace: a.earthlyBranchOfSoulPalace,
-    earthlyBranchOfBodyPalace: a.earthlyBranchOfBodyPalace,
+    earthlyBranchOfBodyPalace: bodyPalaceBranchOf(a.palaces, a.earthlyBranchOfBodyPalace),
     soul: a.soul,
     body: a.body,
     fiveElementsClass: a.fiveElementsClass,
@@ -482,7 +490,7 @@ export function buildExportMd(z: Zwds, opts: ExportOptions = {}): string | null 
   L.push(`| 四柱干支 | ${a.chineseDate} |`);
   L.push(`| 五行局 | ${a.fiveElementsClass}（${z.decades[0]?.range[0] ?? "?"} 岁上运，虚岁） |`);
   L.push(`| 命主 / 身主 | ${a.soul} / ${a.body} |`);
-  L.push(`| 命宫 / 身宫 | ${a.earthlyBranchOfSoulPalace} / ${a.earthlyBranchOfBodyPalace} |`);
+  L.push(`| 命宫 / 身宫 | ${a.earthlyBranchOfSoulPalace} / ${bodyPalaceBranchOf(a.palaces, a.earthlyBranchOfBodyPalace)} |`);
   const origin = a.palaces.find((p) => p.isOriginalPalace);
   if (origin) L.push(`| 来因宫 | ${origin.name}（${origin.earthlyBranch}） |`);
   L.push(`| 生肖 / 星座 | ${a.zodiac} / ${a.sign} |`);

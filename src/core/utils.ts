@@ -199,6 +199,18 @@ export function isYangStem(stem: string): boolean {
   return i >= 0 && i % 2 === 0;
 }
 
+/**
+ * 真实身宫地支：中州派地/人盘重排后，iztro 顶层 earthlyBranchOfBodyPalace
+ * 仍是天盘旧值（上游 rearrangeAstrolable 只更新了 palaces[].isBodyPalace 与命宫支），
+ * 一律从宫列表取准。天盘下两者一致，兜底透传原值。
+ */
+export function bodyPalaceBranchOf(
+  palaces: readonly { isBodyPalace: boolean; earthlyBranch: string }[],
+  fallback: string
+): string {
+  return palaces.find((p) => p.isBodyPalace)?.earthlyBranch ?? fallback;
+}
+
 /** 钟表小时 → iztro timeIndex（23 点为晚子时 12） */
 export function timeIndexFromClock(hour: number): number {
   if (hour >= 23) return 12;

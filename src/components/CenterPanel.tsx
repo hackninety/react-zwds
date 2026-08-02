@@ -1,4 +1,4 @@
-import { BRANCHES, SCOPES, SCOPE_META, isYangStem } from "../core/utils";
+import { BRANCHES, SCOPES, SCOPE_META, bodyPalaceBranchOf, isYangStem } from "../core/utils";
 import type { Zwds } from "../core/useZwds";
 
 const PILLAR_LABELS = ["年", "月", "日", "时"];
@@ -92,7 +92,7 @@ export function CenterPanel({
         <div className="ci">
           <b>命宫·身宫</b>
           <span>
-            {a.earthlyBranchOfSoulPalace} · {a.earthlyBranchOfBodyPalace}
+            {a.earthlyBranchOfSoulPalace} · {bodyPalaceBranchOf(a.palaces, a.earthlyBranchOfBodyPalace)}
           </span>
         </div>
         {origin && (
