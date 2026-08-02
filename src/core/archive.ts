@@ -2,7 +2,7 @@
  * 多盘档案册：把多份起盘参数存入 localStorage，按姓名索引（同名覆盖）。
  * 主输入面板可保存/切换/删除；合盘乙方可直接从档案取人。
  */
-import type { BirthInput } from "./useZwds";
+import { DEFAULT_BIRTH_INPUT, type BirthInput } from "./useZwds";
 
 export type ArchiveEntry = {
   name: string;
@@ -29,7 +29,11 @@ export function listArchive(s: StorageLike | null = defaultStore()): ArchiveEntr
     if (!raw) return [];
     const arr = JSON.parse(raw) as ArchiveEntry[];
     if (!Array.isArray(arr)) return [];
-    return arr.filter((e) => e && typeof e.name === "string" && e.name && e.input);
+    return arr
+      .filter((e) => e && typeof e.name === "string" && e.name && e.input)
+      // 旧版本存档缺新增字段（盘型/四化表/子时界等），读取侧统一补默认值，
+      // 防 undefined 渗入排盘配置（四化表残留上一张盘）
+      .map((e) => ({ ...e, input: { ...DEFAULT_BIRTH_INPUT, ...e.input } }));
   } catch {
     return [];
   }

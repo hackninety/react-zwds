@@ -95,7 +95,46 @@ export function SynastryPanel({ z }: { z: Zwds }) {
     setDraft((dr) => ({ ...dr, date: `${y}-${m}-${dd}`, isLeapMonth: validLeap }));
   };
 
-  /* 乙方排盘（沿用主盘流派口径） */
+  /* 合盘统一口径：流派/四化表/子时界沿用主盘 */
+  const castConfig = {
+    algorithm: z.input.algorithm,
+    yearDivide: z.input.yearDivide,
+    horoscopeDivide: z.input.yearDivide,
+    dayDivide: z.input.dayDivide,
+    mutagens: (MUTAGEN_TABLES[z.input.mutagenTable] ?? MUTAGEN_TABLES.default) as never,
+  };
+
+  /**
+   * 甲方合盘用盘：一律天盘。中州派地/人盘是单人自我观察的重排视角，
+   * 双人互参以天盘为准——主盘选了地/人盘时，这里按同一生辰另起天盘，
+   * 保证与乙方（天盘）口径对称。
+   */
+  const aChart = useMemo(() => {
+    if (!z.astrolabe) return null;
+    if (z.input.algorithm !== "zhongzhou" || z.input.astroType === "heaven") return z.astrolabe;
+    const eff = effectiveBirth(z.input);
+    try {
+      return astro.withOptions({
+        type: eff.calendar,
+        dateStr: eff.dateStr,
+        timeIndex: eff.timeIndex,
+        gender: z.input.gender as unknown as GenderName,
+        isLeapMonth: eff.calendar === "lunar" ? z.input.isLeapMonth : false,
+        fixLeap: true,
+        language: "zh-CN",
+        astroType: "heaven",
+        config: castConfig,
+      });
+    } catch (e) {
+      console.error("[zwds] 合盘甲方天盘排盘失败", e);
+      return z.astrolabe;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [z.astrolabe, z.input]);
+  /** 主盘为地/人盘时，合盘改按天盘互参（提示用） */
+  const aRecast = aChart !== z.astrolabe;
+
+  /* 乙方排盘（沿用主盘流派口径，天盘） */
   const bChart = useMemo(() => {
     if (!applied) return null;
     try {
@@ -108,24 +147,27 @@ export function SynastryPanel({ z }: { z: Zwds }) {
         fixLeap: true,
         language: "zh-CN",
         astroType: "heaven",
-        config: {
-          algorithm: z.input.algorithm,
-          yearDivide: z.input.yearDivide,
-          horoscopeDivide: z.input.yearDivide,
-          dayDivide: z.input.dayDivide,
-          mutagens: MUTAGEN_TABLES[z.input.mutagenTable] as never,
-        },
+        config: castConfig,
       });
     } catch (e) {
       console.error("[zwds] 合盘乙方排盘失败", e);
       return null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applied, z.input.algorithm, z.input.yearDivide, z.input.dayDivide, z.input.mutagenTable]);
 
   const result = useMemo(() => {
-    if (!z.astrolabe || !bChart || !applied) return null;
-    return buildSynastry(z.astrolabe, bChart, z.input.name || "甲方", applied.name || "乙方");
-  }, [z.astrolabe, z.input.name, bChart, applied]);
+    if (!aChart || !bChart || !applied) return null;
+    return buildSynastry(aChart, bChart, z.input.name || "甲方", applied.name || "乙方");
+  }, [aChart, z.input.name, bChart, applied]);
+
+  /** 甲方 K 线（流年合参用）：主盘即天盘时直接复用，另起天盘时按天盘重建 */
+  const aLifeKline = useMemo(() => {
+    if (!aChart) return null;
+    if (!aRecast) return z.lifeKline;
+    const ay = aChart.rawDates.lunarDate.lunarYear;
+    return buildLifeKline(aChart, decadesOfChart(aChart, ay), ay);
+  }, [aChart, aRecast, z.lifeKline]);
 
   /** 乙方 K 线（流年合参用，按需构建一次） */
   const bLifeKline = useMemo(() => {
@@ -136,17 +178,17 @@ export function SynastryPanel({ z }: { z: Zwds }) {
 
   /** 流年合参：随主盘拨盘年份联动 */
   const yearly = useMemo(() => {
-    if (!z.astrolabe || !bChart || !result) return null;
+    if (!aChart || !bChart || !result) return null;
     return buildYearlySynastry(
-      z.astrolabe,
+      aChart,
       bChart,
       result.a.name,
       result.b.name,
       z.pick.year,
-      z.lifeKline,
+      aLifeKline,
       bLifeKline
     );
-  }, [z.astrolabe, bChart, result, z.pick.year, z.lifeKline, bLifeKline]);
+  }, [aChart, bChart, result, z.pick.year, aLifeKline, bLifeKline]);
 
   const go = () => {
     setApplied(draft);
@@ -184,6 +226,7 @@ export function SynastryPanel({ z }: { z: Zwds }) {
         <span className="syn-title">合盘 · 双人相性</span>
         <span className="syn-sub">
           甲方＝当前命盘（{z.input.name || "无名"}）· 乙方在下方输入 · 同性/异性通用 · 流派口径沿用主盘
+          {aRecast && "（主盘为地/人盘：三盘属单人视角，合盘已按双方天盘互参）"}
         </span>
       </div>
 

@@ -69,6 +69,33 @@ export type BirthInput = {
   residence: string;
 };
 
+/**
+ * 起盘参数的中性默认值：新字段随版本增加，localStorage 主输入与多盘档案里的
+ * 旧存档缺这些字段，读取侧必须以本默认值补齐——否则 undefined 会渗入排盘配置
+ * （iztro 全局配置粘性，mutagens: undefined 不清除残留，会静默沿用上一张盘的四化表）。
+ */
+export const DEFAULT_BIRTH_INPUT: BirthInput = {
+  name: "",
+  gender: "男",
+  calendar: "solar",
+  date: "2000-01-01",
+  timeIndex: 0,
+  isLeapMonth: false,
+  exactTime: "",
+  useTrueSolar: false,
+  placeMode: "china",
+  province: "北京",
+  city: "北京",
+  district: "市区",
+  timezone: "",
+  algorithm: "default",
+  yearDivide: "normal",
+  mutagenTable: "default",
+  dayDivide: "forward",
+  astroType: "heaven",
+  residence: "",
+};
+
 export type TrueSolarInfo = {
   clockDate: string;
   clockTime: string;
@@ -189,8 +216,9 @@ export function useZwds(input: BirthInput) {
           yearDivide: input.yearDivide,
           horoscopeDivide: input.yearDivide,
           dayDivide: input.dayDivide,
-          // 整表注入（iztro 全局配置按干合并且不清除，整表覆盖避免切换残留）
-          mutagens: MUTAGEN_TABLES[input.mutagenTable] as never,
+          // 整表注入（iztro 全局配置按干合并且不清除，整表覆盖避免切换残留）；
+          // 键名兜底：mutagens 传 undefined 时 iztro 保留旧表，绝不可放行
+          mutagens: (MUTAGEN_TABLES[input.mutagenTable] ?? MUTAGEN_TABLES.default) as never,
         },
       });
     } catch (e) {

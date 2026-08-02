@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useZwds, BirthInput } from "./core/useZwds";
+import { DEFAULT_BIRTH_INPUT, useZwds, BirthInput } from "./core/useZwds";
 import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
 import { HoroscopeBar } from "./components/HoroscopeBar";
@@ -20,26 +20,12 @@ try {
   /* ignore */
 }
 
+/** 演示盘：在中性默认参数上叠加示例生辰 */
 const DEFAULT_INPUT: BirthInput = {
+  ...DEFAULT_BIRTH_INPUT,
   name: "演示",
-  gender: "男",
-  calendar: "solar",
   date: "2000-08-16",
   timeIndex: 2,
-  isLeapMonth: false,
-  exactTime: "",
-  useTrueSolar: false,
-  placeMode: "china",
-  province: "北京",
-  city: "北京",
-  district: "市区",
-  timezone: "",
-  algorithm: "default",
-  yearDivide: "normal",
-  mutagenTable: "default",
-  dayDivide: "forward",
-  astroType: "heaven",
-  residence: "",
 };
 
 function loadInput(): BirthInput {

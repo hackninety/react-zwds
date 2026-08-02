@@ -71,4 +71,32 @@ describe("archive 多盘档案", () => {
     s.setItem("zwds-archive-v1", JSON.stringify({ not: "array" }));
     expect(listArchive(s)).toEqual([]);
   });
+
+  it("旧版本存档缺新增字段：读取侧补默认值（防四化表/盘型 undefined 渗入排盘）", () => {
+    const s = memStore();
+    // 模拟早期版本仅有基础字段的存档条目
+    const legacy = {
+      name: "旧档",
+      savedAt: 1,
+      input: {
+        name: "旧档",
+        gender: "女",
+        calendar: "solar",
+        date: "1995-05-05",
+        timeIndex: 8,
+        isLeapMonth: false,
+      },
+    };
+    s.setItem("zwds-archive-v1", JSON.stringify([legacy]));
+    const e = listArchive(s)[0];
+    expect(e.input.mutagenTable).toBe("default");
+    expect(e.input.astroType).toBe("heaven");
+    expect(e.input.algorithm).toBe("default");
+    expect(e.input.dayDivide).toBe("forward");
+    expect(e.input.useTrueSolar).toBe(false);
+    // 原有字段不被默认值覆盖
+    expect(e.input.gender).toBe("女");
+    expect(e.input.date).toBe("1995-05-05");
+    expect(e.input.timeIndex).toBe(8);
+  });
 });

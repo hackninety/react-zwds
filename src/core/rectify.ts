@@ -3,7 +3,8 @@
  * 给出关键差异 + 按「性格特征勾选」与「已发生大事年份反查（K线）」打匹配分。
  *
  * 口径：校时按标准时辰排盘（不作真太阳时校正——时辰不详即无可靠钟表时刻）；
- * 流派/四化表/子时界沿用当前输入设置。确定性推演，仅供缩小范围参考。
+ * 流派/四化表/子时界沿用当前输入设置，盘型一律天盘（地/人盘为重排视角，不参与校时）。
+ * 确定性推演，仅供缩小范围参考。
  */
 import { astro } from "iztro";
 import type { GenderName } from "iztro/lib/i18n";
@@ -143,7 +144,7 @@ export const TRAITS: Trait[] = [
   },
 ];
 
-/** 同日十三时辰并排起盘（不作真太阳时校正，流派设置沿用输入） */
+/** 同日十三时辰并排起盘（不作真太阳时校正；流派/四化表沿用输入，盘型一律天盘） */
 export function buildHourCandidates(input: BirthInput): HourCandidate[] {
   const out: HourCandidate[] = [];
   for (const t of TIME_OPTIONS) {
@@ -157,13 +158,15 @@ export function buildHourCandidates(input: BirthInput): HourCandidate[] {
         isLeapMonth: input.isLeapMonth,
         fixLeap: true,
         language: "zh-CN",
-        astroType: input.algorithm === "zhongzhou" ? input.astroType : "heaven",
+        // 校时一律以天盘为基准：地/人盘是同一生辰的重排视角，时辰对了天盘才对，
+        // 用重排盘的命宫核对性格特征会偏靶
+        astroType: "heaven",
         config: {
           algorithm: input.algorithm,
           yearDivide: input.yearDivide,
           horoscopeDivide: input.yearDivide,
           dayDivide: input.dayDivide,
-          mutagens: MUTAGEN_TABLES[input.mutagenTable] as never,
+          mutagens: (MUTAGEN_TABLES[input.mutagenTable] ?? MUTAGEN_TABLES.default) as never,
         },
       });
     } catch {

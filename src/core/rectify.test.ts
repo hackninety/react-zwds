@@ -98,3 +98,18 @@ describe("rectify 生时校正", () => {
     );
   });
 });
+
+describe("rectify 盘型口径", () => {
+  it("主盘为中州地/人盘时，校时仍以天盘为基准", () => {
+    const heaven = buildHourCandidates({ ...input, algorithm: "zhongzhou", astroType: "heaven" });
+    const earth = buildHourCandidates({ ...input, algorithm: "zhongzhou", astroType: "earth" });
+    const human = buildHourCandidates({ ...input, algorithm: "zhongzhou", astroType: "human" });
+    for (let i = 0; i < heaven.length; i++) {
+      // 命宫支/五行局与天盘一致 = 未被地/人盘重排污染
+      expect(earth[i].soulBranch).toBe(heaven[i].soulBranch);
+      expect(human[i].soulBranch).toBe(heaven[i].soulBranch);
+      expect(earth[i].fiveElements).toBe(heaven[i].fiveElements);
+      expect(human[i].fiveElements).toBe(heaven[i].fiveElements);
+    }
+  });
+});
