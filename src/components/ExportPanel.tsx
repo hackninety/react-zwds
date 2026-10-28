@@ -1,5 +1,6 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Zwds } from "../core/useZwds";
+import type { CaseReference } from "mingli-cases-react";
 import {
   assembleAiPayload,
   baseFilename,
@@ -25,7 +26,9 @@ const TAB_META: Record<Tab, { label: string; hint: string }> = {
 };
 
 /** 底部导出面板：复制给 AI / 导出 TOON / 导出 MD，附预览与文件大小（参考 react-8char） */
-export function ExportPanel({ z }: { z: Zwds }) {
+export function ExportPanel({ z, caseReference, onClearReference, getExportRevision }: { z: Zwds; caseReference?: CaseReference | null; onClearReference?: () => void; getExportRevision?: () => number }) {
+  const active = useRef(false);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("ai");
   // 流日/流时默认不导出，择日/择时场景独立勾选（防无关层级稀释 AI 注意力）
@@ -41,14 +44,15 @@ export function ExportPanel({ z }: { z: Zwds }) {
   const dSnap = useDeferredValue(snap);
 
   const toon = useMemo(
-    () => buildExportToon(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly }),
-    [dSnap] // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildExportToon(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly, caseReference }),
+    [dSnap, caseReference] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const md = useMemo(
-    () => buildExportMd(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly }),
-    [dSnap] // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildExportMd(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly, caseReference }),
+    [dSnap, caseReference] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const ai = useMemo(() => (toon ? assembleAiPayload(toon) : null), [toon]);
+  // 引用不走延迟值，清除后立即从复制/下载及其降级路径移除。
+  const ai = useMemo(() => (toon ? assembleAiPayload(toon, caseReference) : null), [toon, caseReference]);
   // 文件名与内容同源（同走 dSnap），勾选流日/流时时带观测点，多份导出不重名
   const fileBase = useMemo(
     () => baseFilename(z, { withDaily: dSnap.withDaily, withHourly: dSnap.withHourly }),
@@ -62,11 +66,14 @@ export function ExportPanel({ z }: { z: Zwds }) {
 
   /** 复制 AI 载荷；剪贴板不可用时退回下载 TOON */
   const copyAi = async () => {
+    const revision = getExportRevision?.();
     try {
       await navigator.clipboard.writeText(ai);
+      if (!active.current || revision !== getExportRevision?.()) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
+      if (!active.current || revision !== getExportRevision?.()) return;
       download(`${fileBase}.toon`, toon, "text/plain;charset=utf-8");
     }
   };
@@ -79,6 +86,11 @@ export function ExportPanel({ z }: { z: Zwds }) {
           复制或下载命盘数据喂给 AI · 均不含人生K线量化数据（防 AI 把自定分值当命理定论，产生误报）
         </span>
       </div>
+
+      {caseReference && <div className="case-reference-note">
+        <span>导出附独立命例参考：{caseReference.title}（非当前命主事实）</span>
+        <button type="button" onClick={onClearReference}>清除参考</button>
+      </div>}
 
       <div className="export-opts">
         <label title="流日运限仅在出行择日等场景有用，默认不导出，防止无关数据稀释 AI 注意力">

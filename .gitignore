@@ -3,4 +3,6 @@ dist
 *.local
 .DS_Store
 *.log
+test-results/
+playwright-report/
 .claude/launch.json

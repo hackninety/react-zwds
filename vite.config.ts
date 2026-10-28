@@ -17,6 +17,7 @@ export default defineConfig({
   },
   server: { port: 5199, strictPort: true },
   build: {
+    manifest: true, // 浏览器回归据此验证命例界面/索引未在首屏预载。
     rollupOptions: {
       output: {
         // rolldown（vite 8 内核）不支持对象式 manualChunks，用 advancedChunks 等价迁移；

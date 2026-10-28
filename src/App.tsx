@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { CaseReference } from "mingli-cases-react";
 import { DEFAULT_BIRTH_INPUT, useZwds, BirthInput } from "./core/useZwds";
 import { InputPanel } from "./components/InputPanel";
 import { Chart } from "./components/Chart";
@@ -9,6 +10,7 @@ import { PatternPanel } from "./components/PatternPanel";
 import { SynastryPanel } from "./components/SynastryPanel";
 import { ExportPanel } from "./components/ExportPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { CaseLibraryEntry } from "./components/CaseLibraryEntry";
 
 const STORAGE_KEY = "zwds-input-v2";
 
@@ -43,6 +45,10 @@ export default function App() {
   // 每次起盘自增，用于强制盘面回到默认命宫位置（即使命宫索引与上一盘相同）
   const [genId, setGenId] = useState(0);
   const [showSyn, setShowSyn] = useState(false);
+  const [caseReference, setCaseReference] = useState<CaseReference | null>(null);
+  const [caseEpoch, setCaseEpoch] = useState(0);
+  const caseGeneration = useRef(0);
+  const exportGeneration = useRef(0);
   const z = useZwds(input);
 
   const toggleSyn = () => {
@@ -57,7 +63,16 @@ export default function App() {
     (window as unknown as { __zwds: typeof z }).__zwds = z;
   }
 
+  const clearCaseReference = () => {
+    // 同步推进世代，旧命例请求即使在卸载前完成也不能给新命盘回填。
+    caseGeneration.current += 1;
+    exportGeneration.current += 1;
+    setCaseEpoch(caseGeneration.current);
+    setCaseReference(null);
+  };
+
   const apply = (v: BirthInput) => {
+    clearCaseReference();
     setInput(v);
     setGenId((g) => g + 1);
     try {
@@ -75,6 +90,7 @@ export default function App() {
         <h1>紫微斗数</h1>
         <span className="top-sub">玄机排盘 · iztro 引擎 · 自研盘面</span>
         <div className="top-actions">
+          <button type="button" onClick={() => document.getElementById("case-library")?.scrollIntoView({ behavior: "smooth" })}>命例库 ↓</button>
           <button
             type="button"
             disabled={!z.astrolabe}
@@ -96,6 +112,10 @@ export default function App() {
       </header>
 
       <InputPanel value={input} onApply={apply} />
+      <CaseLibraryEntry key={`case-library-${caseEpoch}`} reference={caseReference} onClear={clearCaseReference}
+        onReferenceChange={(reference) => {
+          if (caseGeneration.current === caseEpoch) { exportGeneration.current += 1; setCaseReference(reference); }
+        }} />
 
       {z.astrolabe ? (
         <ErrorBoundary>
@@ -104,8 +124,8 @@ export default function App() {
           <PatternPanel z={z} />
           <LifeKline z={z} />
           <DecadePlan z={z} />
-          {showSyn && <SynastryPanel z={z} />}
-          <ExportPanel z={z} />
+          {showSyn && <SynastryPanel z={z} caseReference={caseReference} onClearReference={clearCaseReference} getExportRevision={() => exportGeneration.current} />}
+          <ExportPanel key={`export-${genId}`} z={z} caseReference={caseReference} onClearReference={clearCaseReference} getExportRevision={() => exportGeneration.current} />
         </ErrorBoundary>
       ) : (
         <div className="err-box">

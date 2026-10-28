@@ -27,6 +27,8 @@ import {
 } from "./analysis";
 import { buildDecadePlan } from "./decadePlan";
 import { RULEBOOK_MD, STAR_MUTAGEN_MD, topicGuidesMd } from "./knowledge";
+import type { CaseReference } from "mingli-cases-react";
+import { appendCaseReference, caseReferenceData, CASE_REFERENCE_BOUNDARY } from "./caseReference";
 
 /** 本宫自化（离心）：宫干四化命中本宫主星/辅星 */
 function getSelfMutagens(p: Astrolabe["palaces"][number]) {
@@ -39,6 +41,8 @@ function getSelfMutagens(p: Astrolabe["palaces"][number]) {
 
 /** 导出选项：流日/流时默认不导出（无关层级稀释 AI 注意力，择日择时场景再勾选） */
 export type ExportOptions = {
+  /** 用户主动选择的独立命例资料，不属于当前命主。 */
+  caseReference?: CaseReference | null;
   /** 附当前观测流日（择日用） */
   withDaily?: boolean;
   /** 附当前观测流时（择时用） */
@@ -271,6 +275,7 @@ export function buildExportData(z: Zwds, opts: ExportOptions = {}) {
     /** L3 知识层：十四主星四化要诀 + 分主题推理指引 */
     starEssentials: STAR_MUTAGEN_MD,
     topicGuides: topicGuidesMd(),
+    ...(opts.caseReference ? { caseReference: caseReferenceData(opts.caseReference) } : {}),
   };
 }
 
@@ -698,7 +703,7 @@ export function buildExportMd(z: Zwds, opts: ExportOptions = {}): string | null 
   L.push(STAR_MUTAGEN_MD);
   L.push(topicGuidesMd());
 
-  return L.join("\n");
+  return appendCaseReference(L.join("\n"), opts.caseReference);
 }
 
 /* ─────────────── 下载 ─────────────── */
@@ -756,9 +761,10 @@ const TOON_GUIDE = `# 紫微斗数命盘（AI 分析用 · TOON 数据 + 知识�
 7. 如需切换为飞宫四化视角（以四化流向为主轴论盘），直接引用 analysis.flyMatrix 与 analysis.mutagenChains——忌链看压力/亏欠流向，禄链看资源/情义流向，勿自行重飞。`;
 
 /** 由现成 TOON 文本组装 AI 载荷（底部导出面板已持有 TOON 时复用，避免重复构建） */
-export function assembleAiPayload(toon: string): string {
+export function assembleAiPayload(toon: string, reference?: CaseReference | null): string {
   return [
     TOON_GUIDE,
+    ...(reference ? [`## 命例参考边界\n\n${CASE_REFERENCE_BOUNDARY}`] : []),
     "```toon",
     toon,
     "```",
@@ -775,7 +781,7 @@ export function assembleAiPayload(toon: string): string {
 export function buildExportAiText(z: Zwds, opts: ExportOptions = {}): string | null {
   const toon = buildExportToon(z, opts);
   if (!toon) return null;
-  return assembleAiPayload(toon);
+  return assembleAiPayload(toon, opts.caseReference);
 }
 
 /**

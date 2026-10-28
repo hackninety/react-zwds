@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { astro } from "iztro";
 import type { GenderName } from "iztro/lib/i18n";
 import { effectiveBirth, type Zwds } from "../core/useZwds";
@@ -7,6 +7,8 @@ import { daysInLunarMonth, leapMonthOf } from "../core/lunar";
 import { buildSynastry, buildSynastryMd, buildYearlySynastry } from "../core/synastry";
 import { buildLifeKline, decadesOfChart } from "../core/lifeKline";
 import { listArchive } from "../core/archive";
+import type { CaseReference } from "mingli-cases-react";
+import { appendCaseReference } from "../core/caseReference";
 
 /** 乙方出生信息（甲方=当前主盘；流派/四化表/子时界沿用主盘设置保证口径一致） */
 type BInput = {
@@ -45,7 +47,9 @@ const DIM_META = [
   { key: "wealth" as const, label: "金钱·财路", hint: "合伙搞钱/财缘（含偏财）" },
 ];
 
-export function SynastryPanel({ z }: { z: Zwds }) {
+export function SynastryPanel({ z, caseReference, onClearReference, getExportRevision }: { z: Zwds; caseReference?: CaseReference | null; onClearReference?: () => void; getExportRevision?: () => number }) {
+  const active = useRef(false);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const [draft, setDraft] = useState<BInput>(loadB);
   const [applied, setApplied] = useState<BInput | null>(null);
   const [copied, setCopied] = useState(false);
@@ -191,6 +195,7 @@ export function SynastryPanel({ z }: { z: Zwds }) {
   }, [aChart, bChart, result, z.pick.year, aLifeKline, bLifeKline]);
 
   const go = () => {
+    onClearReference?.();
     setApplied(draft);
     try {
       localStorage.setItem(B_KEY, JSON.stringify(draft));
@@ -201,12 +206,15 @@ export function SynastryPanel({ z }: { z: Zwds }) {
 
   const copyReport = async () => {
     if (!result) return;
-    const md = buildSynastryMd(result, yearly);
+    const revision = getExportRevision?.();
+    const md = appendCaseReference(buildSynastryMd(result, yearly), caseReference);
     try {
       await navigator.clipboard.writeText(md);
+      if (!active.current || revision !== getExportRevision?.()) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
+      if (!active.current || revision !== getExportRevision?.()) return;
       // 剪贴板不可用（权限/非安全上下文）时退回下载
       const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -222,6 +230,10 @@ export function SynastryPanel({ z }: { z: Zwds }) {
 
   return (
     <section className="syn" id="synastry">
+      {caseReference && <div className="case-reference-note">
+        <span>合盘导出附独立命例参考：{caseReference.title}（非甲方或乙方事实）</span>
+        <button type="button" onClick={onClearReference}>清除参考</button>
+      </div>}
       <div className="syn-head">
         <span className="syn-title">合盘 · 双人相性</span>
         <span className="syn-sub">

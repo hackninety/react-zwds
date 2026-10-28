@@ -96,6 +96,31 @@ body {
   padding: 0 18px 34px;
 }
 
+/* 命例资料与主盘输入、AI 输出分区；共享正文沿用本站暗色主题。 */
+.case-library-entry > .pat-head { flex-wrap: wrap; }
+.case-library-entry > .pat-head > button { margin-left: auto; }
+.case-library-entry button, .case-reference-note button {
+  font: inherit;
+  cursor: pointer;
+}
+.case-library-entry > .pat-head > button, .case-reference-note button {
+  padding: 6px 12px;
+  color: var(--cyan);
+  background: rgba(85, 215, 255, 0.07);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+.case-library-content { padding: 14px; }
+.case-reference-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px;
+  color: var(--gold);
+  font-size: 0.8rem;
+}
+
 /* ── 页头 ── */
 .top {
   display: flex;
