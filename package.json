@@ -16,8 +16,8 @@
     "iztro": "^2.5.8",
     "lunar-lite": "^0.2.7",
     "lunar-typescript": "^1.8.6",
-    "mingli-cases-react": "https://github.com/hackninety/common-ts-lib/releases/download/mingli-cases-react-v0.1.0/mingli-cases-react-0.1.0.tgz",
-    "mingli-cases-ts-lib": "https://github.com/hackninety/common-ts-lib/releases/download/mingli-cases-ts-lib-v0.1.0/mingli-cases-ts-lib-0.1.0.tgz",
+    "mingli-cases-react": "https://github.com/hackninety/common-ts-lib/releases/download/mingli-cases-react-v0.1.1/mingli-cases-react-0.1.1.tgz",
+    "mingli-cases-ts-lib": "https://github.com/hackninety/common-ts-lib/releases/download/mingli-cases-ts-lib-v0.1.1/mingli-cases-ts-lib-0.1.1.tgz",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
