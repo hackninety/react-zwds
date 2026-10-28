@@ -32,7 +32,8 @@ test("命例按需加载，独立参考覆盖导出并在清除或换盘时失�
     const library = page.getByRole("region", { name: "紫微命例库" });
     await library.getByLabel("命例年份").selectOption("2026");
     await library.getByLabel("命例列表").getByRole("button").first().click();
-    await library.getByRole("button", { name: /^用于 AI 参考/ }).click();
+    await expect(library.getByRole("button", { name: "用于 AI 参考（含已揭晓答案）", exact: true })).toBeDisabled();
+    await library.getByRole("button", { name: "用于 AI 参考（不含答案）", exact: true }).click();
     await expect(page.getByTestId("selected-case-reference")).toBeVisible();
   }
 
@@ -44,13 +45,24 @@ test("命例按需加载，独立参考覆盖导出并在清除或换盘时失�
   expect(requests.some((path) => /\/cases-contest8_2026-/.test(path))).toBe(true);
   expect(requests.some((path) => /\/(answers|charts)-/.test(path))).toBe(false);
   await expect(library.locator(".ml-answer")).toHaveCount(0);
+  const referenceWithout = library.getByRole("button", { name: "用于 AI 参考（不含答案）", exact: true });
+  const referenceWith = library.getByRole("button", { name: "用于 AI 参考（含已揭晓答案）", exact: true });
+  await expect(referenceWith).toBeDisabled();
+  // 未揭晓时选为参考不得请求答案分块，导出也不含答案。
+  await referenceWithout.click();
+  await expect(page.getByTestId("selected-case-reference")).toContainText("非当前命主事实");
+  expect(requests.some((path) => /\/answers-/.test(path))).toBe(false);
+  const withoutAnswers = decode(await exported(page, /^导出 TOON/)) as Record<string, any>;
+  expect(withoutAnswers.caseReference.caseId).toBeTruthy();
+  expect(JSON.stringify(withoutAnswers.caseReference)).not.toContain("显式揭晓的原资料答案");
   await library.getByRole("button", { name: "揭晓答案" }).first().click();
   await expect(library.locator(".ml-answer").first()).toBeVisible();
   expect(requests.some((path) => /\/answers-contest8_2026-/.test(path))).toBe(true);
-  await library.getByRole("button", { name: /^用于 AI 参考/ }).click();
+  await referenceWith.click();
   await expect(page.getByTestId("selected-case-reference")).toContainText("非当前命主事实");
   await expect(input.getByLabel("阳历生日")).toHaveValue(birthBefore);
   const selected = decode(await exported(page, /^导出 TOON/)) as Record<string, any>;
+  expect(JSON.stringify(selected.caseReference)).toContain("显式揭晓的原资料答案");
   expect(selected.input).toEqual(plain.input);
   expect(selected.basic).toEqual(plain.basic);
   expect(selected.caseReference.caseId).toBeTruthy();
