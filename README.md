@@ -8,12 +8,18 @@
 
 远程地址为 **`https://mcp.0x7c.cc/mcp`**，传输方式选择 **Streamable HTTP**，**无需令牌或登录**。AI 可直接调用排盘和 `common-ts-lib` 检索工具，再根据结果分析，无需先在网页复制命盘。
 
+统一服务 `paipan-common` 提供 **31 个工具**：6 个跨术数排盘与 common 检索基础工具、11 个 `bazi_` 八字高级工具、14 个 `taiyi_` 太乙高级工具；另有 7 个提示词和 5 个静态资源。本机 stdio 与远程 HTTP 使用同一套能力，每次传完整参数，不使用旧 `chartId`。
+
+`prepare_reading.searchQueries` 可明确提供 1–3 个检索关键词，原问题保留在 `question`，结果会返回实际关键词。
+
+首次配置时按所用客户端选择一条；本机 stdio 与远程 HTTP 二选一。已存在 `paipan-common` 时先在客户端移除旧同名连接再更换方式，旧 `bazi`、`taiyi`、`paipan-common-remote` 连接可移除，避免重复注册。保存后重连 MCP。
+
 ```bash
 # Codex
-codex mcp add paipan-common-remote --url https://mcp.0x7c.cc/mcp
+codex mcp add paipan-common --url https://mcp.0x7c.cc/mcp
 
 # Claude Code
-claude mcp add --transport http --scope user paipan-common-remote https://mcp.0x7c.cc/mcp
+claude mcp add --transport http --scope user paipan-common https://mcp.0x7c.cc/mcp
 ```
 
 命令分别用于对应客户端，配置后重连 MCP。已有本机 `paipan-common` 时，本机与远程选一种即可；其他支持远程 MCP 的客户端填写同一地址、传输方式与“无鉴权”。配置依据：[Codex 官方文档](https://learn.chatgpt.com/docs/extend/mcp)、[Claude Code 官方文档](https://code.claude.com/docs/en/mcp)。
@@ -27,7 +33,7 @@ claude mcp add --transport http --scope user paipan-common-remote https://mcp.0x
 
 紫微输入须明确公历生日、时分、时区及性别；启用真太阳时还须出生地经度，流日/流时查询必须给出 `queryTime`。时辰不详时先确认缺项，不用 12:00 代填。IANA 时区会按日期处理夏令时，固定 `+08:00` 始终表示东八区。
 
-统一 MCP 有 `system_catalog`、`chart_calculate`、`prepare_reading`、`corpus_list`、`corpus_search`、`corpus_read` 六个工具，紫微对应的 common 资料为公开命例库。本页面的结构分析、合盘、校时、K线和本地二十篇古籍有各自的页面/导出入口，不代表统一 MCP 已暴露同名工具或全部资料。排盘口径以 `system_catalog` 为准：目前 `ageDivide` 只支持 `normal`，立春年界按日期判断；晚子设置影响日干支口径，不表示全盘跨到次日，观测时刻 23 点按当日子时处理。
+统一 MCP 的基础工具有 `system_catalog`、`chart_calculate`、`prepare_reading`、`corpus_list`、`corpus_search`、`corpus_read`，紫微对应的 common 资料为公开命例库。本页面的结构分析、合盘、校时、K线和本地二十篇古籍有各自的页面/导出入口，不代表统一 MCP 已暴露同名工具或全部资料。排盘口径以 `system_catalog` 为准：目前 `ageDivide` 只支持 `normal`，立春年界按日期判断；晚子设置影响日干支口径，不表示全盘跨到次日，观测时刻 23 点按当日子时处理。
 
 ## 特性
 
